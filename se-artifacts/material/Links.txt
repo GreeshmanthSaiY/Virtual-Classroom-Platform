@@ -1,0 +1,24 @@
+Tools to be used as a part of SE course
+1.JIRA
+2.Jenkins
+3.Selinium
+4.Cobertura
+5.coverity
+6.Unit testing -JUnit, pyunit
+7.bitbucket
+8.Apache Maven
+9.sonarcube
+
+
+
+https://www.youtube.com/watch?v=uM_m6EzMg3k&t=1343s
+
+
+https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=278253
+
+
+
+https://www.youtube.com/watch?v=uM_m6EzMg3k&t=1343s
+
+
+https://www.atlassian.com/software/confluence/resources
