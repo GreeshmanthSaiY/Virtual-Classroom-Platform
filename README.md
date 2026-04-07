@@ -1,6 +1,24 @@
 # 🎓 Virtual Classroom — A Software Engineering Case Study
 
-> A full-stack web application that enables interactive online learning for students and faculty. Built as a Software Engineering course case study using **JSP**, **Java Servlets**, **MySQL**, and **Bootstrap** — following Agile/Scrum methodology.
+> A full-stack web application that enables interactive online learning for students and faculty. Built as a Software Engineering course case study using **JSP**, **Java Servlets**, **MySQL**, and modern web technologies.
+
+---
+
+## 📌 Highlights
+- Full-stack system with role-based access (Student / Faculty / Admin)
+- Secure authentication, session handling, and database integration
+- Built using JSP, Servlets, and MySQL
+- Comprehensive Software Engineering artifacts and documentation
+
+---
+
+## 🎯 Problem Statement
+Traditional classroom systems lack scalable digital interaction and centralized access to learning resources. This project provides a web-based platform for structured communication and content delivery, enabling students and faculty to collaborate effectively in a digital environment.
+
+---
+
+## 🏗️ System Overview
+Frontend (JSP) → Backend (Servlets) → Database (MySQL) → Role-based Access Control
 
 ---
 
@@ -46,7 +64,7 @@
 
 ## 🗂️ Project Structure
 
-```
+```plaintext
 virtual-classroom/
 │
 ├── src/                            # JSP & HTML source pages
