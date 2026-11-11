@@ -153,3 +153,4 @@ class FacultyAuthorizationSecurityTest {
         verify(videoLectureRepository, times(1)).save(any(VideoLecture.class));
     }
 }
+

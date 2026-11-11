@@ -118,3 +118,4 @@ class StudentAuthorizationSecurityTest {
         assertTrue(ex.getMessage().contains("not enrolled in this subject"));
     }
 }
+
