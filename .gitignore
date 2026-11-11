@@ -16,6 +16,9 @@ target/
 coverage/
 *.lcov
 .nyc_output
+playwright-report/
+test-results/
+blob-report/
 
 # Logs
 logs/

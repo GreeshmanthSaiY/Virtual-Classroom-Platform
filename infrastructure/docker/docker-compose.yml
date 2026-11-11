@@ -6,15 +6,15 @@ services:
     container_name: virtual-classroom-db
     restart: always
     environment:
-      POSTGRES_DB: virtual_classroom
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgrespassword
+      POSTGRES_DB: ${POSTGRES_DB:-virtual_classroom}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgrespassword}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d virtual_classroom"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-virtual_classroom}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -29,13 +29,19 @@ services:
       db:
         condition: service_healthy
     environment:
-      SPRING_PROFILES_ACTIVE: docker
-      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/virtual_classroom
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: postgrespassword
-      JWT_SECRET: c2VjdXJlLXZpcnR1YWwtY2xhc3Nyb29tLXBsYXRmb3JtLWtleS0yMDI2LWVudGVycHJpc2Utc2VjdXJl
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-docker}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-virtual_classroom}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgrespassword}
+      JWT_SECRET: ${JWT_SECRET:-c2VjdXJlLXZpcnR1YWwtY2xhc3Nyb29tLXBsYXRmb3JtLWtleS0yMDI2LWVudGVycHJpc2Utc2VjdXJl}
     ports:
-      - "8080:8080"
+      - "${BACKEND_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   frontend:
     build:
@@ -44,10 +50,10 @@ services:
     container_name: virtual-classroom-frontend
     restart: on-failure
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     ports:
-      - "3000:80"
+      - "${FRONTEND_PORT:-3000}:80"
 
 volumes:
   pgdata:
-
