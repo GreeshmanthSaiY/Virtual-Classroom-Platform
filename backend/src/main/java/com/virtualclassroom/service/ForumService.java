@@ -6,11 +6,13 @@ import com.virtualclassroom.dto.CreateQuestionRequest;
 import com.virtualclassroom.dto.QuestionDto;
 import com.virtualclassroom.model.Answer;
 import com.virtualclassroom.model.Question;
+import com.virtualclassroom.model.Role;
 import com.virtualclassroom.model.Subject;
 import com.virtualclassroom.model.User;
 import com.virtualclassroom.repository.AnswerRepository;
 import com.virtualclassroom.repository.QuestionRepository;
 import com.virtualclassroom.repository.SubjectRepository;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +36,13 @@ public class ForumService {
         this.auditLogService = auditLogService;
     }
 
+
+    @Transactional(readOnly = true)
+    public List<QuestionDto> getAllQuestions() {
+        return questionRepository.findAllByOrderByCreatedAtDesc().stream()
+                .map(this::toSummaryDto)
+                .collect(Collectors.toList());
+    }
 
     @Transactional(readOnly = true)
     public List<QuestionDto> getQuestionsBySubject(Integer subjectId) {
@@ -110,6 +119,23 @@ public class ForumService {
     public void markQuestionResolved(Long questionId, User actor) {
         Question question = questionRepository.findById(questionId)
                 .orElseThrow(() -> new IllegalArgumentException("Question not found"));
+        if (!question.getAuthor().getId().equals(actor.getId()) && actor.getRole() != Role.ROLE_ADMIN) {
+            throw new AccessDeniedException("Only the author of the question or an admin can mark a question as resolved");
+        }
+        question.setIsResolved(true);
+        questionRepository.save(question);
+    }
+
+    @Transactional
+    public void markAnswerAccepted(Long answerId, User actor) {
+        Answer answer = answerRepository.findById(answerId)
+                .orElseThrow(() -> new IllegalArgumentException("Answer not found"));
+        Question question = answer.getQuestion();
+        if (!question.getAuthor().getId().equals(actor.getId()) && actor.getRole() != Role.ROLE_ADMIN) {
+            throw new AccessDeniedException("Only the author of the question or an admin can mark an answer as accepted");
+        }
+        answer.setIsAccepted(true);
+        answerRepository.save(answer);
         question.setIsResolved(true);
         questionRepository.save(question);
     }

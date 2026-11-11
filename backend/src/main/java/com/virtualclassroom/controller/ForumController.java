@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1/discussions")
+@RequestMapping({"/api/v1/discussions", "/api/v1/forum"})
 @Tag(name = "Q&A Discussions", description = "Student-Faculty Discussion Threads")
 public class ForumController {
 
@@ -28,6 +28,17 @@ public class ForumController {
         this.userRepository = userRepository;
     }
 
+
+    @GetMapping("/questions")
+    @Operation(summary = "Get all questions across subjects or optionally filtered by subjectId")
+    public ResponseEntity<ApiResponse<List<QuestionDto>>> getAllQuestions(
+            @RequestParam(required = false) Integer subjectId
+    ) {
+        List<QuestionDto> questions = (subjectId != null)
+                ? forumService.getQuestionsBySubject(subjectId)
+                : forumService.getAllQuestions();
+        return ResponseEntity.ok(ApiResponse.success(questions, "Questions retrieved successfully"));
+    }
 
     @GetMapping("/subject/{subjectId}")
     @Operation(summary = "Get all questions posted in a subject forum")
@@ -77,5 +88,16 @@ public class ForumController {
         User user = userRepository.getReferenceById(principal.getId());
         forumService.markQuestionResolved(questionId, user);
         return ResponseEntity.ok(ApiResponse.success(null, "Question marked as resolved"));
+    }
+
+    @PatchMapping("/answers/{answerId}/accept")
+    @Operation(summary = "Mark an answer as accepted")
+    public ResponseEntity<ApiResponse<Void>> acceptAnswer(
+            @PathVariable Long answerId,
+            @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        User user = userRepository.getReferenceById(principal.getId());
+        forumService.markAnswerAccepted(answerId, user);
+        return ResponseEntity.ok(ApiResponse.success(null, "Answer accepted successfully"));
     }
 }

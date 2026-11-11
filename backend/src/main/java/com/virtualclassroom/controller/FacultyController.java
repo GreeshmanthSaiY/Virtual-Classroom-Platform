@@ -38,6 +38,26 @@ public class FacultyController {
         return ResponseEntity.ok(ApiResponse.success(subjects, "Assigned subjects retrieved"));
     }
 
+    @GetMapping("/materials")
+    @Operation(summary = "Get study materials uploaded by this faculty member")
+    public ResponseEntity<ApiResponse<List<StudyMaterialDto>>> getMaterials(
+            @RequestParam(required = false) Integer subjectId,
+            @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        List<StudyMaterialDto> materials = facultyService.getMaterialsByFaculty(principal.getId(), subjectId);
+        return ResponseEntity.ok(ApiResponse.success(materials, "Study materials retrieved"));
+    }
+
+    @GetMapping("/lectures")
+    @Operation(summary = "Get video lectures published by this faculty member")
+    public ResponseEntity<ApiResponse<List<VideoLectureDto>>> getLectures(
+            @RequestParam(required = false) Integer subjectId,
+            @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        List<VideoLectureDto> lectures = facultyService.getLecturesByFaculty(principal.getId(), subjectId);
+        return ResponseEntity.ok(ApiResponse.success(lectures, "Video lectures retrieved"));
+    }
+
     @PostMapping("/materials")
     @Operation(summary = "Upload a new study material resource")
     public ResponseEntity<ApiResponse<StudyMaterialDto>> uploadMaterial(

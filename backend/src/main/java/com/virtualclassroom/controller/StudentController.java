@@ -39,16 +39,48 @@ public class StudentController {
         return ResponseEntity.ok(ApiResponse.success(subjects, "Enrolled subjects retrieved"));
     }
 
+    @GetMapping("/materials")
+    @Operation(summary = "Get study materials for all enrolled subjects")
+    public ResponseEntity<ApiResponse<List<StudyMaterialDto>>> getEnrolledMaterials(
+            @RequestParam(required = false) Integer subjectId,
+            @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        List<StudyMaterialDto> materials = studentService.getAllEnrolledMaterials(principal.getId(), subjectId);
+        return ResponseEntity.ok(ApiResponse.success(materials, "Study materials retrieved"));
+    }
+
+    @GetMapping("/lectures")
+    @Operation(summary = "Get video lectures for all enrolled subjects")
+    public ResponseEntity<ApiResponse<List<VideoLectureDto>>> getEnrolledLectures(
+            @RequestParam(required = false) Integer subjectId,
+            @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        List<VideoLectureDto> lectures = studentService.getAllEnrolledLectures(principal.getId(), subjectId);
+        return ResponseEntity.ok(ApiResponse.success(lectures, "Video lectures retrieved"));
+    }
+
     @GetMapping("/subjects/{subjectId}/materials")
     @Operation(summary = "Get study materials for an enrolled subject")
-    public ResponseEntity<ApiResponse<List<StudyMaterialDto>>> getSubjectMaterials(@PathVariable Integer subjectId) {
+    public ResponseEntity<ApiResponse<List<StudyMaterialDto>>> getSubjectMaterials(
+            @PathVariable Integer subjectId,
+            @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        if (!"ROLE_ADMIN".equals(principal.getRole())) {
+            studentService.verifyStudentEnrolledInSubject(principal.getId(), subjectId);
+        }
         List<StudyMaterialDto> materials = studentService.getMaterialsForSubject(subjectId);
         return ResponseEntity.ok(ApiResponse.success(materials, "Study materials retrieved"));
     }
 
     @GetMapping("/subjects/{subjectId}/lectures")
     @Operation(summary = "Get video lectures for an enrolled subject")
-    public ResponseEntity<ApiResponse<List<VideoLectureDto>>> getSubjectLectures(@PathVariable Integer subjectId) {
+    public ResponseEntity<ApiResponse<List<VideoLectureDto>>> getSubjectLectures(
+            @PathVariable Integer subjectId,
+            @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        if (!"ROLE_ADMIN".equals(principal.getRole())) {
+            studentService.verifyStudentEnrolledInSubject(principal.getId(), subjectId);
+        }
         List<VideoLectureDto> lectures = studentService.getLecturesForSubject(subjectId);
         return ResponseEntity.ok(ApiResponse.success(lectures, "Video lectures retrieved"));
     }

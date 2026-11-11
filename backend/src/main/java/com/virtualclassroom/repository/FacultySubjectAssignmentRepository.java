@@ -10,5 +10,6 @@ import java.util.List;
 public interface FacultySubjectAssignmentRepository extends JpaRepository<FacultySubjectAssignment, FacultySubjectAssignment.AssignmentId> {
     List<FacultySubjectAssignment> findByFacultyId(Long facultyId);
     List<FacultySubjectAssignment> findBySubjectId(Integer subjectId);
+    boolean existsByFacultyIdAndSubjectId(Long facultyId, Integer subjectId);
 }
 

@@ -52,7 +52,7 @@ export const AdminDashboard: React.FC = () => {
   const handleApprove = async (userId: number) => {
     setActionLoading(true);
     try {
-      await apiClient.post('/admin/approve', { userIds: [userId] });
+      await apiClient.post('/admin/approvals', { userIds: [userId] });
       await loadData();
     } catch (err) {
       console.error('Approval failed', err);
@@ -71,7 +71,7 @@ export const AdminDashboard: React.FC = () => {
     if (!selectedUserToReject) return;
     setActionLoading(true);
     try {
-      await apiClient.post('/admin/reject', {
+      await apiClient.post('/admin/rejections', {
         userIds: [selectedUserToReject.id],
         reason: rejectReason,
       });

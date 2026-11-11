@@ -70,7 +70,7 @@ public class AdminController {
         return ResponseEntity.ok(ApiResponse.success(users, "Users list retrieved"));
     }
 
-    @PostMapping("/approvals")
+    @PostMapping({"/approvals", "/approve"})
     @Operation(summary = "Approve user registration requests")
     public ResponseEntity<ApiResponse<Void>> approveUsers(
             @Valid @RequestBody ApprovalRequest request,
@@ -82,7 +82,7 @@ public class AdminController {
         return ResponseEntity.ok(ApiResponse.success(null, "Users approved successfully"));
     }
 
-    @PostMapping("/rejections")
+    @PostMapping({"/rejections", "/reject"})
     @Operation(summary = "Reject user registration requests with documented reason")
     public ResponseEntity<ApiResponse<Void>> rejectUsers(
             @Valid @RequestBody RejectRequest request,

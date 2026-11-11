@@ -43,6 +43,23 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 Long userId = tokenProvider.getUserIdFromJWT(jwt);
 
                 UserDetails userDetails = customUserDetailsService.loadUserById(userId);
+
+                // Account status verification: check enabled, locked, suspended, approved, rejected
+                if (!userDetails.isEnabled() || !userDetails.isAccountNonLocked()) {
+                    String statusInfo = (userDetails instanceof UserPrincipal principal)
+                            ? String.valueOf(principal.getStatus())
+                            : "INACTIVE";
+                    log.warn("Access denied for user ID {} due to account status: {}", userId, statusInfo);
+                    SecurityContextHolder.clearContext();
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    response.setContentType("application/json");
+                    response.getWriter().write(String.format(
+                            "{\"success\":false,\"message\":\"Account is %s. Access revoked.\",\"data\":null}",
+                            statusInfo
+                    ));
+                    return;
+                }
+
                 UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                         userDetails, null, userDetails.getAuthorities()
                 );

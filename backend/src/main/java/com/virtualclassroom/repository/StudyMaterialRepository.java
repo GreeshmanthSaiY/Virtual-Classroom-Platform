@@ -13,5 +13,7 @@ public interface StudyMaterialRepository extends JpaRepository<StudyMaterial, Lo
     List<StudyMaterial> findBySubjectId(Integer subjectId);
     Page<StudyMaterial> findBySubjectId(Integer subjectId, Pageable pageable);
     List<StudyMaterial> findByUploaderId(Long uploaderId);
+    List<StudyMaterial> findByUploaderIdAndSubjectId(Long uploaderId, Integer subjectId);
+    List<StudyMaterial> findBySubjectIdIn(List<Integer> subjectIds);
 }
 

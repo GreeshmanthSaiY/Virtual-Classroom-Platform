@@ -1,0 +1,457 @@
+openapi: 3.0.3
+info:
+  title: Virtual Classroom Platform REST API
+  description: Authoritative Enterprise OpenAPI Specification for the Virtual Classroom Platform
+  version: 1.0.0
+  contact:
+    name: Virtual Classroom Engineering Team
+    email: security@virtualclassroom.edu
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local Development Server
+  - url: https://api.virtualclassroom.edu/api/v1
+    description: Production Server
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Enter JWT Bearer token obtained from /auth/login
+
+  schemas:
+    ApiResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          type: object
+        timestamp:
+          type: string
+          format: date-time
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        tokenType:
+          type: string
+          example: Bearer
+        user:
+          $ref: '#/components/schemas/UserDto'
+
+    UserDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        email:
+          type: string
+          format: email
+        fullName:
+          type: string
+        role:
+          type: string
+          enum: [ROLE_STUDENT, ROLE_FACULTY, ROLE_ADMIN]
+        status:
+          type: string
+          enum: [PENDING, APPROVED, REJECTED, SUSPENDED]
+
+    DegreeDto:
+      type: object
+      properties:
+        id:
+          type: integer
+        code:
+          type: string
+        name:
+          type: string
+        durationYears:
+          type: integer
+
+    CourseDto:
+      type: object
+      properties:
+        id:
+          type: integer
+        degreeId:
+          type: integer
+        degreeName:
+          type: string
+        code:
+          type: string
+        name:
+          type: string
+
+    SubjectDto:
+      type: object
+      properties:
+        id:
+          type: integer
+        courseId:
+          type: integer
+        courseName:
+          type: string
+        code:
+          type: string
+        title:
+          type: string
+        yearLevel:
+          type: integer
+
+    StudyMaterialDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        subjectId:
+          type: integer
+        subjectTitle:
+          type: string
+        uploaderId:
+          type: integer
+          format: int64
+        uploaderName:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        fileUrl:
+          type: string
+        fileSizeBytes:
+          type: integer
+          format: int64
+        mimeType:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    VideoLectureDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        subjectId:
+          type: integer
+        subjectTitle:
+          type: string
+        facultyId:
+          type: integer
+          format: int64
+        facultyName:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        videoUrl:
+          type: string
+        durationSeconds:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    QuestionDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        subjectId:
+          type: integer
+        subjectTitle:
+          type: string
+        authorId:
+          type: integer
+          format: int64
+        authorName:
+          type: string
+        authorRole:
+          type: string
+        title:
+          type: string
+        body:
+          type: string
+        isResolved:
+          type: boolean
+        answersCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        answers:
+          type: array
+          items:
+            $ref: '#/components/schemas/AnswerDto'
+
+    AnswerDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        questionId:
+          type: integer
+          format: int64
+        authorId:
+          type: integer
+          format: int64
+        authorName:
+          type: string
+        authorRole:
+          type: string
+        body:
+          type: string
+        isAccepted:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+paths:
+  /auth/login:
+    post:
+      summary: Authenticate user credentials and issue JWT
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Successfully authenticated
+        '401':
+          description: Bad credentials or unapproved account
+
+  /auth/register/student:
+    post:
+      summary: Submit student registration request
+      responses:
+        '200':
+          description: Registration submitted with PENDING status
+
+  /auth/register/faculty:
+    post:
+      summary: Submit faculty registration request
+      responses:
+        '200':
+          description: Registration submitted with PENDING status
+
+  /auth/me:
+    get:
+      security:
+        - BearerAuth: []
+      summary: Get authenticated user identity and role
+      responses:
+        '200':
+          description: User identity returned
+
+  /courses/degrees:
+    get:
+      summary: List all academic degrees
+      responses:
+        '200':
+          description: List of degrees
+
+  /courses/by-degree/{degreeId}:
+    get:
+      summary: List courses offered under a degree
+      parameters:
+        - name: degreeId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of courses
+
+  /students/subjects:
+    get:
+      security:
+        - BearerAuth: []
+      summary: Get subjects matching student's enrolled course and year
+      responses:
+        '200':
+          description: Enrolled subjects
+
+  /students/materials:
+    get:
+      security:
+        - BearerAuth: []
+      summary: Get study materials for all enrolled subjects
+      parameters:
+        - name: subjectId
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Study materials
+
+  /students/lectures:
+    get:
+      security:
+        - BearerAuth: []
+      summary: Get video lectures for all enrolled subjects
+      parameters:
+        - name: subjectId
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Video lectures
+
+  /faculty/subjects:
+    get:
+      security:
+        - BearerAuth: []
+      summary: Get subjects assigned to faculty
+      responses:
+        '200':
+          description: Assigned subjects
+
+  /faculty/materials:
+    get:
+      security:
+        - BearerAuth: []
+      summary: Get materials uploaded by faculty
+      parameters:
+        - name: subjectId
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Materials list
+    post:
+      security:
+        - BearerAuth: []
+      summary: Upload new study material to an assigned subject
+      responses:
+        '200':
+          description: Material published
+        '403':
+          description: Faculty not assigned to subject
+
+  /faculty/lectures:
+    get:
+      security:
+        - BearerAuth: []
+      summary: Get video lectures published by faculty
+      parameters:
+        - name: subjectId
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Lectures list
+    post:
+      security:
+        - BearerAuth: []
+      summary: Publish new video lecture to an assigned subject
+      responses:
+        '200':
+          description: Lecture published
+        '403':
+          description: Faculty not assigned to subject
+
+  /discussions/questions:
+    get:
+      security:
+        - BearerAuth: []
+      summary: Get questions across subjects or for a specific subject
+      parameters:
+        - name: subjectId
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Questions retrieved
+    post:
+      security:
+        - BearerAuth: []
+      summary: Post a new discussion thread
+      responses:
+        '200':
+          description: Question created
+
+  /discussions/answers/{answerId}/accept:
+    patch:
+      security:
+        - BearerAuth: []
+      summary: Mark an answer as accepted
+      parameters:
+        - name: answerId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Answer marked as accepted
+
+  /admin/metrics:
+    get:
+      security:
+        - BearerAuth: []
+      summary: Get platform telemetry and analytics
+      responses:
+        '200':
+          description: Metrics object
+        '403':
+          description: Admin access required
+
+  /admin/approvals:
+    post:
+      security:
+        - BearerAuth: []
+      summary: Approve user registration requests
+      responses:
+        '200':
+          description: Users approved
+        '403':
+          description: Admin access required
+
+  /admin/rejections:
+    post:
+      security:
+        - BearerAuth: []
+      summary: Reject user registration requests with reason
+      responses:
+        '200':
+          description: Users rejected
+        '403':
+          description: Admin access required
