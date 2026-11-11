@@ -11,3 +11,4 @@ public interface FacultySubjectAssignmentRepository extends JpaRepository<Facult
     List<FacultySubjectAssignment> findByFacultyId(Long facultyId);
     List<FacultySubjectAssignment> findBySubjectId(Integer subjectId);
 }
+

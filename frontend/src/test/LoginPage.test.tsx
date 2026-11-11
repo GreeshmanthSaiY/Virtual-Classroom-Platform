@@ -26,3 +26,4 @@ describe('LoginPage Component', () => {
     expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument();
   });
 });
+

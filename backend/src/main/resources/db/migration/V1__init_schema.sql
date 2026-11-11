@@ -139,3 +139,4 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 );
 
 CREATE INDEX idx_audit_timestamp ON audit_logs(timestamp DESC);
+

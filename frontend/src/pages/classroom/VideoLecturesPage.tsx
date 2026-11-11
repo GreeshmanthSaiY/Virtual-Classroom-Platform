@@ -208,3 +208,4 @@ export const VideoLecturesPage: React.FC = () => {
     </div>
   );
 };
+

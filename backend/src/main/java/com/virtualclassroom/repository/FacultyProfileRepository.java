@@ -11,3 +11,4 @@ public interface FacultyProfileRepository extends JpaRepository<FacultyProfile, 
     Optional<FacultyProfile> findByEmployeeId(String employeeId);
     boolean existsByEmployeeId(String employeeId);
 }
+

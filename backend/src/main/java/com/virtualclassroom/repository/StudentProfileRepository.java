@@ -11,3 +11,4 @@ public interface StudentProfileRepository extends JpaRepository<StudentProfile, 
     Optional<StudentProfile> findByRollNumber(String rollNumber);
     boolean existsByRollNumber(String rollNumber);
 }
+

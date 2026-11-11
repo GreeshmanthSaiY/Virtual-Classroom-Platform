@@ -285,3 +285,4 @@ export const FacultyRegisterPage: React.FC = () => {
     </div>
   );
 };
+

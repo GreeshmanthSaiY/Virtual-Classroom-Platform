@@ -12,3 +12,4 @@ public interface CourseRepository extends JpaRepository<Course, Integer> {
     Optional<Course> findByCode(String code);
     List<Course> findByDegreeId(Integer degreeId);
 }
+

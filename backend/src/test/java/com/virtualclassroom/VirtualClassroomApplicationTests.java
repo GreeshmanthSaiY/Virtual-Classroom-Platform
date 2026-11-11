@@ -13,3 +13,4 @@ class VirtualClassroomApplicationTests {
         // Verifies Spring application context boots cleanly
     }
 }
+

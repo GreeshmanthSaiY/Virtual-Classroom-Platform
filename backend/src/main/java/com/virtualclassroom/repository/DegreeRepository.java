@@ -10,3 +10,4 @@ import java.util.Optional;
 public interface DegreeRepository extends JpaRepository<Degree, Integer> {
     Optional<Degree> findByCode(String code);
 }
+

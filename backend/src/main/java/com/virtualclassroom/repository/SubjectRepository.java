@@ -13,3 +13,4 @@ public interface SubjectRepository extends JpaRepository<Subject, Integer> {
     List<Subject> findByCourseId(Integer courseId);
     List<Subject> findByCourseIdAndYearLevel(Integer courseId, Integer yearLevel);
 }
+

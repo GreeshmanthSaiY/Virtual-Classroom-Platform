@@ -18,3 +18,4 @@ describe('Badge Component', () => {
     expect(container.firstChild).toHaveClass('text-rose-700');
   });
 });
+

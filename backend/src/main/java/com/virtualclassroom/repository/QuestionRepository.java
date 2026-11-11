@@ -14,3 +14,4 @@ public interface QuestionRepository extends JpaRepository<Question, Long> {
     Page<Question> findBySubjectId(Integer subjectId, Pageable pageable);
     List<Question> findByAuthorIdOrderByCreatedAtDesc(Long authorId);
 }
+

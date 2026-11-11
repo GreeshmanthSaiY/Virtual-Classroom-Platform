@@ -26,3 +26,4 @@ describe('Navbar Component', () => {
     expect(screen.getByText('Get Started')).toBeInTheDocument();
   });
 });
+

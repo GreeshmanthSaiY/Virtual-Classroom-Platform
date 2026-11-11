@@ -10,3 +10,4 @@ public class VirtualClassroomApplication {
         SpringApplication.run(VirtualClassroomApplication.class, args);
     }
 }
+

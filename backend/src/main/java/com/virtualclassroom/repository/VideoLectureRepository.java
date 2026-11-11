@@ -14,3 +14,4 @@ public interface VideoLectureRepository extends JpaRepository<VideoLecture, Long
     Page<VideoLecture> findBySubjectId(Integer subjectId, Pageable pageable);
     List<VideoLecture> findByFacultyId(Long facultyId);
 }
+
