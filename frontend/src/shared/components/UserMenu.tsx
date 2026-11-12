@@ -5,6 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { Badge } from './Badge';
 import { ChangePasswordModal } from '@/features/auth/ChangePasswordModal';
+import { UserProfileModal } from '@/features/auth/UserProfileModal';
 
 export const UserMenu: React.FC = () => {
   const { user, logout } = useAuth();
@@ -12,6 +13,7 @@ export const UserMenu: React.FC = () => {
   const navigate = useNavigate();
 
   const [isOpen, setIsOpen] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
 
   if (!user) return null;
@@ -87,6 +89,17 @@ export const UserMenu: React.FC = () => {
                 <button
                   onClick={() => {
                     setIsOpen(false);
+                    setShowProfileModal(true);
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                >
+                  <User className="w-4 h-4 text-slate-400" />
+                  My Academic Profile
+                </button>
+
+                <button
+                  onClick={() => {
+                    setIsOpen(false);
                     setShowPasswordModal(true);
                   }}
                   className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
@@ -127,6 +140,7 @@ export const UserMenu: React.FC = () => {
         )}
       </div>
 
+      <UserProfileModal isOpen={showProfileModal} onClose={() => setShowProfileModal(false)} />
       <ChangePasswordModal isOpen={showPasswordModal} onClose={() => setShowPasswordModal(false)} />
     </>
   );

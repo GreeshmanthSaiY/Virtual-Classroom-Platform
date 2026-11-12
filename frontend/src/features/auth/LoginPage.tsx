@@ -14,6 +14,41 @@ const loginSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
+// Strict sanitation preventing open redirect attacks
+export const sanitizeRedirectPath = (path: unknown): string | null => {
+  if (typeof path !== 'string') return null;
+  const trimmed = path.trim();
+  if (
+    trimmed.startsWith('/') &&
+    !trimmed.startsWith('//') &&
+    !trimmed.includes(':') &&
+    !trimmed.includes('\\')
+  ) {
+    return trimmed;
+  }
+  return null;
+};
+
+// Demo credentials helper strictly gated to DEV mode with explicit flag
+const isDemoEnabled = import.meta.env.DEV && import.meta.env.VITE_ENABLE_DEMO_CREDENTIALS === 'true';
+
+const DEMO_CREDENTIALS = isDemoEnabled
+  ? {
+      admin: {
+        email: 'admin@virtualclassroom.edu',
+        password: import.meta.env.VITE_DEMO_ADMIN_PASSWORD || 'Admin@2025!',
+      },
+      faculty: {
+        email: 'dr.jeevan@virtualclassroom.edu',
+        password: import.meta.env.VITE_DEMO_FACULTY_PASSWORD || 'Faculty@2025!',
+      },
+      student: {
+        email: 'gaurav.shukla@virtualclassroom.edu',
+        password: import.meta.env.VITE_DEMO_STUDENT_PASSWORD || 'Student@2025!',
+      },
+    }
+  : null;
+
 export const LoginPage: React.FC = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -39,9 +74,10 @@ export const LoginPage: React.FC = () => {
     setSubmitting(true);
     try {
       const user = await login(data.email, data.password);
-      const from = (location.state as { from?: { pathname: string } })?.from?.pathname;
-      if (from) {
-        navigate(from, { replace: true });
+      const rawFrom = (location.state as { from?: { pathname: string } })?.from?.pathname;
+      const safeFrom = sanitizeRedirectPath(rawFrom);
+      if (safeFrom) {
+        navigate(safeFrom, { replace: true });
         return;
       }
 
@@ -89,36 +125,38 @@ export const LoginPage: React.FC = () => {
           </p>
         </div>
 
-        {/* Demo Accounts Bar */}
-        <div className="p-3 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700/80 space-y-2">
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300">
-            <ShieldCheck className="w-3.5 h-3.5 text-primary-600 dark:text-primary-400" />
-            <span>Quick-Fill Demo Credentials:</span>
+        {/* Demo Accounts Bar - Strictly rendered in DEV environment when explicitly enabled */}
+        {isDemoEnabled && DEMO_CREDENTIALS && (
+          <div className="p-3 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700/80 space-y-2">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300">
+              <ShieldCheck className="w-3.5 h-3.5 text-primary-600 dark:text-primary-400" />
+              <span>Quick-Fill Demo Credentials (Dev Only):</span>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => handleDemoFill(DEMO_CREDENTIALS.admin.email, DEMO_CREDENTIALS.admin.password)}
+                className="px-2 py-1.5 text-xs font-medium rounded-lg bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 hover:border-primary-500 text-slate-700 dark:text-slate-200 transition-colors"
+              >
+                Admin
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDemoFill(DEMO_CREDENTIALS.faculty.email, DEMO_CREDENTIALS.faculty.password)}
+                className="px-2 py-1.5 text-xs font-medium rounded-lg bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 hover:border-primary-500 text-slate-700 dark:text-slate-200 transition-colors"
+              >
+                Faculty
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDemoFill(DEMO_CREDENTIALS.student.email, DEMO_CREDENTIALS.student.password)}
+                className="px-2 py-1.5 text-xs font-medium rounded-lg bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 hover:border-primary-500 text-slate-700 dark:text-slate-200 transition-colors"
+              >
+                Student
+              </button>
+            </div>
           </div>
-          <div className="grid grid-cols-3 gap-2">
-            <button
-              type="button"
-              onClick={() => handleDemoFill('admin@virtualclassroom.edu', 'Admin@2025!')}
-              className="px-2 py-1.5 text-xs font-medium rounded-lg bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 hover:border-primary-500 text-slate-700 dark:text-slate-200 transition-colors"
-            >
-              Admin
-            </button>
-            <button
-              type="button"
-              onClick={() => handleDemoFill('dr.jeevan@virtualclassroom.edu', 'Faculty@2025!')}
-              className="px-2 py-1.5 text-xs font-medium rounded-lg bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 hover:border-primary-500 text-slate-700 dark:text-slate-200 transition-colors"
-            >
-              Faculty
-            </button>
-            <button
-              type="button"
-              onClick={() => handleDemoFill('gaurav.shukla@virtualclassroom.edu', 'Student@2025!')}
-              className="px-2 py-1.5 text-xs font-medium rounded-lg bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 hover:border-primary-500 text-slate-700 dark:text-slate-200 transition-colors"
-            >
-              Student
-            </button>
-          </div>
-        </div>
+        )}
 
         {/* Error Alert */}
         {authError && (

@@ -331,6 +331,7 @@ export interface ProfileUpdateRequest {
   bio?: string;
   avatarUrl?: string;
   officeHours?: string;
+  designation?: string;
 }
 
 export interface CourseCreateRequest {
@@ -373,5 +374,26 @@ export interface LiveSessionCreateRequest {
   platform?: string;
   scheduledStart: string;
   scheduledEnd: string;
+}
+
+export interface FileUploadResponse {
+  fileUrl: string;
+  storagePath: string;
+  originalFilename: string;
+  mimeType: string;
+  fileSizeBytes: number;
+}
+
+export interface SignedUploadUrlRequest {
+  fileName: string;
+  fileType: string;
+  folder?: string;
+}
+
+export interface SignedUploadUrlResponse {
+  uploadUrl: string;
+  storagePath: string;
+  publicUrl?: string;
+  expiresInSeconds: number;
 }
 

@@ -77,7 +77,7 @@ export const facultyService = {
   },
 
   gradeExamResult: async (
-    data: { examinationId: number; studentId: number; marksObtained: number; remarks?: string }
+    data: { examinationId: number; studentId: number; marksObtained: number; grade: string; remarks?: string }
   ): Promise<ExaminationResult> => {
     const res = await apiClient.post<ApiResponse<ExaminationResult>>('/examinations/grades', data);
     return res.data.data;

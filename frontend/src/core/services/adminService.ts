@@ -18,6 +18,18 @@ export const adminService = {
     return res.data.data;
   },
 
+  searchUsers: async (params?: {
+    q?: string;
+    role?: string;
+    status?: string;
+    page?: number;
+    size?: number;
+    sort?: string;
+  }): Promise<PageResponse<User>> => {
+    const res = await apiClient.get<ApiResponse<PageResponse<User>>>('/admin/users/search', { params });
+    return res.data.data;
+  },
+
   getPendingStudents: async (): Promise<User[]> => {
     const res = await apiClient.get<ApiResponse<User[]>>('/admin/students/pending');
     return res.data.data;

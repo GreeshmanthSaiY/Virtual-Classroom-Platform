@@ -6,3 +6,4 @@ export * from './ResetPasswordPage';
 export * from './ChangePasswordModal';
 export * from './UnauthorizedPage';
 export * from './SessionExpiredModal';
+export * from './UserProfileModal';

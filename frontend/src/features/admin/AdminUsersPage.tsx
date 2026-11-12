@@ -39,10 +39,11 @@ export const AdminUsersPage: React.FC = () => {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const data: PageResponse<User> = await adminService.getUsers({
+      const data: PageResponse<User> = await adminService.searchUsers({
         page,
         size: 15,
-        role: selectedRole,
+        q: searchQuery.trim() || undefined,
+        role: selectedRole || undefined,
         status: selectedStatus || undefined,
       });
       setUsers(data?.content || []);
@@ -56,8 +57,11 @@ export const AdminUsersPage: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchUsers();
-  }, [page, selectedRole, selectedStatus]);
+    const handler = setTimeout(() => {
+      fetchUsers();
+    }, 250);
+    return () => clearTimeout(handler);
+  }, [page, selectedRole, selectedStatus, searchQuery]);
 
   const handleOpenSuspend = (user: User) => {
     setSelectedUser(user);

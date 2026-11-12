@@ -4,3 +4,4 @@ export * from './facultyService';
 export * from './studentService';
 export * from './notificationService';
 export * from './academicContentService';
+export * from './storageService';

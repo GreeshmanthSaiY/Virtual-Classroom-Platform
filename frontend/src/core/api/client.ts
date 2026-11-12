@@ -49,24 +49,14 @@ export function normalizeError(error: unknown): ApiError {
   return new ApiError(500, 'Unknown operational failure');
 }
 
-// Memory-backed token accessor with localStorage synchronization
-let memoryToken: string | null = typeof window !== 'undefined' ? localStorage.getItem('vc_token') : null;
+// Pure in-memory access token storage (zero localStorage / sessionStorage persistence)
+let memoryToken: string | null = null;
 
 export const setAccessToken = (token: string | null) => {
   memoryToken = token;
-  if (typeof window !== 'undefined') {
-    if (token) {
-      localStorage.setItem('vc_token', token);
-    } else {
-      localStorage.removeItem('vc_token');
-    }
-  }
 };
 
 export const getAccessToken = (): string | null => {
-  if (!memoryToken && typeof window !== 'undefined') {
-    memoryToken = localStorage.getItem('vc_token');
-  }
   return memoryToken;
 };
 
@@ -185,9 +175,6 @@ apiClient.interceptors.response.use(
       } catch (refreshErr) {
         processQueue(refreshErr, null);
         setAccessToken(null);
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('vc_user');
-        }
         notifySessionExpired();
         return Promise.reject(normalizeError(refreshErr));
       } finally {

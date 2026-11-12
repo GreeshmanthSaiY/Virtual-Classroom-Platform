@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { facultyService } from '@/core/services/facultyService';
+import { storageService } from '@/core/services/storageService';
 import { Subject, Assignment, AssignmentSubmission, PageResponse } from '@/types';
 import { Plus, ExternalLink, Users, Calendar, AlertCircle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/shared/components/Card';
@@ -26,8 +27,24 @@ export const FacultyAssignmentsPage: React.FC = () => {
   const [dueDate, setDueDate] = useState('');
   const [maxPoints, setMaxPoints] = useState(100);
   const [attachmentUrl, setAttachmentUrl] = useState('');
+  const [uploadingFile, setUploadingFile] = useState(false);
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingFile(true);
+    setCreateError(null);
+    try {
+      const uploaded = await storageService.uploadFile(file, 'assignments');
+      setAttachmentUrl(uploaded.fileUrl);
+    } catch (err: any) {
+      setCreateError(err?.message || 'File upload failed');
+    } finally {
+      setUploadingFile(false);
+    }
+  };
 
   // Submissions Modal
   const [submissionsModalOpen, setSubmissionsModalOpen] = useState(false);
@@ -325,13 +342,28 @@ export const FacultyAssignmentsPage: React.FC = () => {
             />
           </div>
 
+          <div className="space-y-2">
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+              Upload Problem Sheet Document (Optional)
+            </label>
+            <div className="flex items-center gap-3">
+              <input
+                type="file"
+                onChange={handleFileUpload}
+                disabled={uploadingFile || createLoading}
+                className="text-xs text-slate-600 dark:text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 dark:file:bg-slate-800 dark:file:text-primary-400"
+              />
+              {uploadingFile && <LoadingSpinner size="sm" label="Uploading..." />}
+            </div>
+          </div>
+
           <Input
             label="Resource Attachment Link (Optional)"
             type="url"
             value={attachmentUrl}
             onChange={(e) => setAttachmentUrl(e.target.value)}
             placeholder="https://..."
-            helperText="Link to problem sheet, datasets or syllabus document."
+            helperText="Auto-filled on upload or direct link to problem sheet, datasets or syllabus document."
           />
 
           <div className="flex justify-end gap-2 pt-2">

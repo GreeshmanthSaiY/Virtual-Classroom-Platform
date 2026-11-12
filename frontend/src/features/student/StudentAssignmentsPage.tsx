@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { studentService } from '@/core/services/studentService';
+import { storageService } from '@/core/services/storageService';
 import { Subject, Assignment, AssignmentSubmission, PageResponse } from '@/types';
 import { Calendar, CheckCircle2, Upload, AlertCircle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/shared/components/Card';
@@ -27,9 +28,25 @@ export const StudentAssignmentsPage: React.FC = () => {
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
   const [submissionText, setSubmissionText] = useState('');
   const [fileUrl, setFileUrl] = useState('');
+  const [uploadingFile, setUploadingFile] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingFile(true);
+    setSubmitError(null);
+    try {
+      const uploaded = await storageService.uploadFile(file, 'assignments');
+      setFileUrl(uploaded.fileUrl);
+    } catch (err: any) {
+      setSubmitError(err?.message || 'File upload failed. You may manually provide a link instead.');
+    } finally {
+      setUploadingFile(false);
+    }
+  };
 
   useEffect(() => {
     const fetchInit = async () => {
@@ -315,13 +332,29 @@ export const StudentAssignmentsPage: React.FC = () => {
                 rows={5}
               />
 
+              <div className="space-y-2">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                  Upload Assignment Document (PDF / DOCX / ZIP)
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="file"
+                    id="assignment-file-input"
+                    onChange={handleFileUpload}
+                    disabled={uploadingFile || submitLoading}
+                    className="text-xs text-slate-600 dark:text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 dark:file:bg-slate-800 dark:file:text-primary-400"
+                  />
+                  {uploadingFile && <LoadingSpinner size="sm" label="Uploading..." />}
+                </div>
+              </div>
+
               <Input
-                label="Document / Solution Attachment URL"
+                label="Or Direct Solution Attachment URL"
                 type="url"
                 value={fileUrl}
                 onChange={(e) => setFileUrl(e.target.value)}
                 placeholder="https://..."
-                helperText="Link to Google Drive, GitHub repository, or Cloud Storage file."
+                helperText="Auto-filled on upload or link to Google Drive, GitHub repository, or Cloud Storage file."
               />
 
               <div className="flex justify-end gap-2 pt-2">

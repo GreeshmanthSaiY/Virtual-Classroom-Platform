@@ -41,9 +41,22 @@ export const FacultyExamsPage: React.FC = () => {
   const [gradeModalOpen, setGradeModalOpen] = useState(false);
   const [targetStudent, setTargetStudent] = useState<User | null>(null);
   const [marksObtained, setMarksObtained] = useState<number>(0);
+  const [grade, setGrade] = useState('A');
   const [remarks, setRemarks] = useState('');
   const [gradeError, setGradeError] = useState<string | null>(null);
   const [gradeActionLoading, setGradeActionLoading] = useState(false);
+
+  const calculateLetterGrade = (marks: number, total: number): string => {
+    if (total <= 0) return 'Pass';
+    const pct = (marks / total) * 100;
+    if (pct >= 90) return 'A+';
+    if (pct >= 80) return 'A';
+    if (pct >= 70) return 'B+';
+    if (pct >= 60) return 'B';
+    if (pct >= 50) return 'C';
+    if (pct >= 40) return 'D';
+    return 'F';
+  };
 
   useEffect(() => {
     const fetchInit = async () => {
@@ -137,7 +150,9 @@ export const FacultyExamsPage: React.FC = () => {
   const handleOpenEnterGrade = (student: User) => {
     const existing = examResults.find((r) => r.studentId === student.id);
     setTargetStudent(student);
-    setMarksObtained(existing ? existing.marksObtained : 0);
+    const initialMarks = existing ? existing.marksObtained : 0;
+    setMarksObtained(initialMarks);
+    setGrade(existing?.grade || (selectedExam ? calculateLetterGrade(initialMarks, selectedExam.totalMarks) : 'A'));
     setRemarks(existing?.remarks || '');
     setGradeError(null);
     setGradeModalOpen(true);
@@ -152,12 +167,18 @@ export const FacultyExamsPage: React.FC = () => {
       return;
     }
 
+    if (!grade.trim()) {
+      setGradeError('Grade designation is required (e.g. A, B+, Pass).');
+      return;
+    }
+
     setGradeActionLoading(true);
     try {
       await facultyService.gradeExamResult({
         examinationId: selectedExam.id,
         studentId: targetStudent.id,
         marksObtained: Number(marksObtained),
+        grade: grade.trim(),
         remarks,
       });
       setGradeModalOpen(false);
@@ -487,16 +508,36 @@ export const FacultyExamsPage: React.FC = () => {
             </div>
           )}
 
-          <Input
-            label={`Marks Obtained (0 to ${selectedExam?.totalMarks})`}
-            type="number"
-            min={0}
-            max={selectedExam?.totalMarks ?? 100}
-            step="0.5"
-            value={marksObtained}
-            onChange={(e) => setMarksObtained(Number(e.target.value))}
-            required
-          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Input
+              label={`Marks Obtained (0 to ${selectedExam?.totalMarks})`}
+              type="number"
+              min={0}
+              max={selectedExam?.totalMarks ?? 100}
+              step="0.5"
+              value={marksObtained}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                setMarksObtained(val);
+                if (selectedExam) {
+                  setGrade(calculateLetterGrade(val, selectedExam.totalMarks));
+                }
+              }}
+              required
+            />
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
+                Grade Letter / Mark
+              </label>
+              <Input
+                value={grade}
+                onChange={(e) => setGrade(e.target.value)}
+                placeholder="e.g. A+, A, B, Pass"
+                required
+              />
+            </div>
+          </div>
 
           <Input
             label="Evaluation Remarks / Annotations"
