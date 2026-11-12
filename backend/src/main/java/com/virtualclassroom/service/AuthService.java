@@ -5,6 +5,7 @@ import com.virtualclassroom.model.*;
 import com.virtualclassroom.repository.*;
 import com.virtualclassroom.security.JwtTokenProvider;
 import com.virtualclassroom.security.UserPrincipal;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -13,7 +14,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 public class AuthService {
@@ -28,8 +32,39 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider tokenProvider;
     private final AuditLogService auditLogService;
+    private final RefreshTokenRepository refreshTokenRepository;
 
-    public AuthService(AuthenticationManager authenticationManager, UserRepository userRepository, StudentProfileRepository studentProfileRepository, FacultyProfileRepository facultyProfileRepository, CourseRepository courseRepository, SubjectRepository subjectRepository, FacultySubjectAssignmentRepository assignmentRepository, PasswordEncoder passwordEncoder, JwtTokenProvider tokenProvider, AuditLogService auditLogService) {
+    public AuthService(
+            AuthenticationManager authenticationManager,
+            UserRepository userRepository,
+            StudentProfileRepository studentProfileRepository,
+            FacultyProfileRepository facultyProfileRepository,
+            CourseRepository courseRepository,
+            SubjectRepository subjectRepository,
+            FacultySubjectAssignmentRepository assignmentRepository,
+            PasswordEncoder passwordEncoder,
+            JwtTokenProvider tokenProvider,
+            AuditLogService auditLogService
+    ) {
+        this(authenticationManager, userRepository, studentProfileRepository, facultyProfileRepository,
+                courseRepository, subjectRepository, assignmentRepository, passwordEncoder, tokenProvider,
+                auditLogService, null);
+    }
+
+    @Autowired
+    public AuthService(
+            AuthenticationManager authenticationManager,
+            UserRepository userRepository,
+            StudentProfileRepository studentProfileRepository,
+            FacultyProfileRepository facultyProfileRepository,
+            CourseRepository courseRepository,
+            SubjectRepository subjectRepository,
+            FacultySubjectAssignmentRepository assignmentRepository,
+            PasswordEncoder passwordEncoder,
+            JwtTokenProvider tokenProvider,
+            AuditLogService auditLogService,
+            @Autowired(required = false) RefreshTokenRepository refreshTokenRepository
+    ) {
         this.authenticationManager = authenticationManager;
         this.userRepository = userRepository;
         this.studentProfileRepository = studentProfileRepository;
@@ -40,6 +75,7 @@ public class AuthService {
         this.passwordEncoder = passwordEncoder;
         this.tokenProvider = tokenProvider;
         this.auditLogService = auditLogService;
+        this.refreshTokenRepository = refreshTokenRepository;
     }
 
 
@@ -67,6 +103,17 @@ public class AuthService {
 
         String jwt = tokenProvider.generateToken(authentication);
 
+        String refreshTokenString = null;
+        if (refreshTokenRepository != null) {
+            refreshTokenString = UUID.randomUUID().toString();
+            RefreshToken refreshToken = RefreshToken.builder()
+                    .user(user)
+                    .tokenHash(refreshTokenString)
+                    .expiresAt(Instant.now().plus(7, ChronoUnit.DAYS))
+                    .build();
+            refreshTokenRepository.save(refreshToken);
+        }
+
         auditLogService.logAction(user, "USER_LOGIN", "users", user.getId().toString(), "Successful login", ipAddress);
 
         return AuthResponse.builder()
@@ -77,7 +124,64 @@ public class AuthService {
                 .fullName(user.getFullName())
                 .role(user.getRole().name())
                 .status(user.getStatus().name())
+                .refreshToken(refreshTokenString)
                 .build();
+    }
+
+    @Transactional
+    public AuthResponse refreshToken(String tokenString, String ipAddress) {
+        if (refreshTokenRepository == null) {
+            throw new IllegalStateException("Refresh token repository is not configured");
+        }
+
+        RefreshToken storedToken = refreshTokenRepository.findByTokenHash(tokenString)
+                .orElseThrow(() -> new BadCredentialsException("Invalid refresh token"));
+
+        if (storedToken.isRevoked() || storedToken.getExpiresAt().isBefore(Instant.now())) {
+            throw new BadCredentialsException("Refresh token is expired or revoked");
+        }
+
+        User user = storedToken.getUser();
+        if (user.getStatus() != UserStatus.APPROVED) {
+            throw new IllegalStateException("Account is not active");
+        }
+
+        // Revoke the old token (rotation)
+        storedToken.setRevoked(true);
+        refreshTokenRepository.save(storedToken);
+
+        // Issue new JWT and new rotated refresh token
+        String newJwt = tokenProvider.generateTokenFromUser(user);
+        String newRefreshTokenString = UUID.randomUUID().toString();
+        RefreshToken newRefreshToken = RefreshToken.builder()
+                .user(user)
+                .tokenHash(newRefreshTokenString)
+                .expiresAt(Instant.now().plus(7, ChronoUnit.DAYS))
+                .build();
+        refreshTokenRepository.save(newRefreshToken);
+
+        auditLogService.logAction(user, "TOKEN_REFRESH", "users", user.getId().toString(), "Rotated refresh token", ipAddress);
+
+        return AuthResponse.builder()
+                .token(newJwt)
+                .tokenType("Bearer")
+                .id(user.getId())
+                .email(user.getEmail())
+                .fullName(user.getFullName())
+                .role(user.getRole().name())
+                .status(user.getStatus().name())
+                .refreshToken(newRefreshTokenString)
+                .build();
+    }
+
+    @Transactional
+    public void revokeRefreshToken(String tokenString) {
+        if (refreshTokenRepository != null) {
+            refreshTokenRepository.findByTokenHash(tokenString).ifPresent(token -> {
+                token.setRevoked(true);
+                refreshTokenRepository.save(token);
+            });
+        }
     }
 
     @Transactional

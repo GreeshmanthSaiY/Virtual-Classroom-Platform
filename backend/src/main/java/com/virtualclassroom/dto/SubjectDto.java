@@ -9,6 +9,9 @@ public class SubjectDto {
     private String code;
     private String title;
     private Integer yearLevel;
+    private Integer semester;
+    private Integer credits;
+    private String description;
 
     public SubjectDto() {}
 
@@ -19,6 +22,8 @@ public class SubjectDto {
         this.code = code;
         this.title = title;
         this.yearLevel = yearLevel;
+        this.semester = 1;
+        this.credits = 3;
     }
 
     public Integer getId() { return id; }
@@ -33,6 +38,12 @@ public class SubjectDto {
     public void setTitle(String title) { this.title = title; }
     public Integer getYearLevel() { return yearLevel; }
     public void setYearLevel(Integer yearLevel) { this.yearLevel = yearLevel; }
+    public Integer getSemester() { return semester; }
+    public void setSemester(Integer semester) { this.semester = semester; }
+    public Integer getCredits() { return credits; }
+    public void setCredits(Integer credits) { this.credits = credits; }
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
 
     public static Builder builder() {
         return new Builder();
@@ -45,6 +56,9 @@ public class SubjectDto {
         private String code;
         private String title;
         private Integer yearLevel;
+        private Integer semester = 1;
+        private Integer credits = 3;
+        private String description;
 
         public Builder id(Integer id) {
             this.id = id;
@@ -70,9 +84,25 @@ public class SubjectDto {
             this.yearLevel = yearLevel;
             return this;
         }
+        public Builder semester(Integer semester) {
+            this.semester = semester;
+            return this;
+        }
+        public Builder credits(Integer credits) {
+            this.credits = credits;
+            return this;
+        }
+        public Builder description(String description) {
+            this.description = description;
+            return this;
+        }
 
         public SubjectDto build() {
-            return new SubjectDto(id, courseId, courseName, code, title, yearLevel);
+            SubjectDto dto = new SubjectDto(id, courseId, courseName, code, title, yearLevel);
+            dto.setSemester(semester != null ? semester : 1);
+            dto.setCredits(credits != null ? credits : 3);
+            dto.setDescription(description);
+            return dto;
         }
     }
 }

@@ -175,19 +175,30 @@ npm run build
 
 ---
 
-## 🔑 Demo Academic Credentials
+## 📚 Comprehensive Architecture Documentation
 
-The seed migration (`V2__seed_academic_data.sql`) seeds verified demonstration accounts:
+The complete architectural specifications are documented under `docs/architecture/`:
+- [Database Entity-Relationship (ER) Diagram](file:///c:/Users/GS_Y/Downloads/New folder/Mine/Projects/Github/virtual-classroom/docs/architecture/database/ER-DIAGRAM.md) — 20-table Mermaid ER diagram and relational constraints.
+- [Database Data Dictionary](file:///c:/Users/GS_Y/Downloads/New folder/Mine/Projects/Github/virtual-classroom/docs/architecture/database/DATA-DICTIONARY.md) — Exhaustive column-by-column schema specifications.
+- [Database Architecture Design](file:///c:/Users/GS_Y/Downloads/New folder/Mine/Projects/Github/virtual-classroom/docs/architecture/database/DATABASE-ARCHITECTURE.md) — Normalization, indexing topologies, and Supabase connections.
+- [Flyway Migration Strategy](file:///c:/Users/GS_Y/Downloads/New folder/Mine/Projects/Github/virtual-classroom/docs/architecture/database/MIGRATION-STRATEGY.md) — Versioning lifecycle and zero-downtime evolution.
+- [Supabase Integration & Storage Guide](file:///c:/Users/GS_Y/Downloads/New folder/Mine/Projects/Github/virtual-classroom/docs/architecture/database/SUPABASE-SETUP.md) — Direct vs pooled JDBC setup and storage bucket policies.
+- [Canonical API Contract (v1)](file:///c:/Users/GS_Y/Downloads/New folder/Mine/Projects/Github/virtual-classroom/docs/architecture/api/API-CONTRACT.md) — Endpoints, DTO schemas, and RBAC matrix.
+- [OpenAPI 3.0 Specification](file:///c:/Users/GS_Y/Downloads/New folder/Mine/Projects/Github/virtual-classroom/docs/openapi.yaml) — Machine-readable OpenAPI contract.
 
-| Role | Email | Password | Status |
-|---|---|---|---|
-| **Administrator** | `admin@virtualclassroom.edu` | `Admin@2025!` | `APPROVED` |
-| **Faculty (Instructor)** | `dr.jeevan@virtualclassroom.edu` | `Faculty@2025!` | `APPROVED` |
-| **Faculty (Instructor)** | `prof.sharma@virtualclassroom.edu` | `Faculty@2025!` | `APPROVED` |
-| **Student** | `gaurav.shukla@virtualclassroom.edu` | `Student@2025!` | `APPROVED` |
-| **Pending Applicant** | `rohit.verma@virtualclassroom.edu` | `Student@2025!` | `PENDING` |
+---
 
-*(Quick-fill buttons on the Sign In page allow 1-click credential loading for demo purposes).*
+## 🔑 Development Environment Seeding & Credentials
+
+In accordance with Milestone 2 security hardening, production migrations (`V3`) strictly purged hardcoded credentials. For local development and demonstration testing, use the development seeding profile:
+
+| Role | Email | Status |
+|---|---|---|
+| **Administrator** | `admin@virtualclassroom.edu` | `APPROVED` |
+| **Faculty (Instructor)** | `dr.jeevan@virtualclassroom.edu` | `APPROVED` |
+| **Faculty (Instructor)** | `prof.sharma@virtualclassroom.edu` | `APPROVED` |
+| **Student** | `gaurav.shukla@virtualclassroom.edu` | `APPROVED` |
+| **Pending Applicant** | `rohit.verma@virtualclassroom.edu` | `PENDING` |
 
 ---
 

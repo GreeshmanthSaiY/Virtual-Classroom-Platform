@@ -72,32 +72,48 @@ components:
           enum: [ROLE_STUDENT, ROLE_FACULTY, ROLE_ADMIN]
         status:
           type: string
-          enum: [PENDING, APPROVED, REJECTED, SUSPENDED]
+          enum: [PENDING, APPROVED, REJECTED, SUSPENDED, DISABLED]
+        rejectionReason:
+          type: string
+        rollNumber:
+          type: string
+        employeeId:
+          type: string
+        department:
+          type: string
+        courseName:
+          type: string
+        currentYear:
+          type: integer
+        avatarUrl:
+          type: string
+        phoneNumber:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
 
-    DegreeDto:
+    RefreshTokenRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+
+    UpdateProfileRequest:
       type: object
       properties:
-        id:
-          type: integer
-        code:
+        fullName:
           type: string
-        name:
+        phoneNumber:
           type: string
-        durationYears:
-          type: integer
-
-    CourseDto:
-      type: object
-      properties:
-        id:
-          type: integer
-        degreeId:
-          type: integer
-        degreeName:
+        avatarUrl:
           type: string
-        code:
+        bio:
           type: string
-        name:
+        designation:
+          type: string
+        officeHours:
           type: string
 
     SubjectDto:
@@ -115,6 +131,305 @@ components:
           type: string
         yearLevel:
           type: integer
+        semester:
+          type: integer
+        credits:
+          type: integer
+        description:
+          type: string
+
+    AssignmentDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        subjectId:
+          type: integer
+        subjectCode:
+          type: string
+        subjectTitle:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        dueDate:
+          type: string
+          format: date-time
+        maxPoints:
+          type: integer
+        attachmentUrl:
+          type: string
+        createdByName:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateAssignmentRequest:
+      type: object
+      required: [subjectId, title, description, dueDate]
+      properties:
+        subjectId:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        dueDate:
+          type: string
+          format: date-time
+        maxPoints:
+          type: integer
+        attachmentUrl:
+          type: string
+
+    AssignmentSubmissionDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        assignmentId:
+          type: integer
+          format: int64
+        assignmentTitle:
+          type: string
+        studentId:
+          type: integer
+          format: int64
+        studentName:
+          type: string
+        studentEmail:
+          type: string
+        submissionText:
+          type: string
+        fileUrl:
+          type: string
+        submittedAt:
+          type: string
+          format: date-time
+        gradePoints:
+          type: integer
+        maxPoints:
+          type: integer
+        feedback:
+          type: string
+        gradedByName:
+          type: string
+        gradedAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [DRAFT, SUBMITTED, LATE, GRADED, RESUBMISSION_REQUESTED]
+
+    SubmitAssignmentRequest:
+      type: object
+      required: [assignmentId]
+      properties:
+        assignmentId:
+          type: integer
+          format: int64
+        submissionText:
+          type: string
+        fileUrl:
+          type: string
+
+    GradeSubmissionRequest:
+      type: object
+      required: [gradePoints]
+      properties:
+        gradePoints:
+          type: integer
+        feedback:
+          type: string
+
+    LiveSessionDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        subjectId:
+          type: integer
+        subjectCode:
+          type: string
+        subjectTitle:
+          type: string
+        hostFacultyId:
+          type: integer
+          format: int64
+        hostFacultyName:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        meetingLink:
+          type: string
+        platform:
+          type: string
+        scheduledStart:
+          type: string
+          format: date-time
+        scheduledEnd:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [SCHEDULED, LIVE, COMPLETED, CANCELLED]
+
+    CreateLiveSessionRequest:
+      type: object
+      required: [subjectId, title, meetingLink, scheduledStart, scheduledEnd]
+      properties:
+        subjectId:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        meetingLink:
+          type: string
+        platform:
+          type: string
+        scheduledStart:
+          type: string
+          format: date-time
+        scheduledEnd:
+          type: string
+          format: date-time
+
+    ExaminationDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        subjectId:
+          type: integer
+        subjectCode:
+          type: string
+        subjectTitle:
+          type: string
+        createdByName:
+          type: string
+        title:
+          type: string
+        examType:
+          type: string
+          enum: [QUIZ, MIDTERM, FINAL, LAB_PRACTICAL]
+        totalMarks:
+          type: integer
+        durationMinutes:
+          type: integer
+        scheduledAt:
+          type: string
+          format: date-time
+        instructions:
+          type: string
+
+    CreateExaminationRequest:
+      type: object
+      required: [subjectId, title, examType, totalMarks, durationMinutes, scheduledAt]
+      properties:
+        subjectId:
+          type: integer
+        title:
+          type: string
+        examType:
+          type: string
+          enum: [QUIZ, MIDTERM, FINAL, LAB_PRACTICAL]
+        totalMarks:
+          type: integer
+        durationMinutes:
+          type: integer
+        scheduledAt:
+          type: string
+          format: date-time
+        instructions:
+          type: string
+
+    ExaminationResultDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        examinationId:
+          type: integer
+          format: int64
+        examinationTitle:
+          type: string
+        examType:
+          type: string
+        totalMarks:
+          type: integer
+        studentId:
+          type: integer
+          format: int64
+        studentName:
+          type: string
+        studentRollNumber:
+          type: string
+        marksObtained:
+          type: number
+        grade:
+          type: string
+        remarks:
+          type: string
+        gradedByName:
+          type: string
+        gradedAt:
+          type: string
+          format: date-time
+
+    RecordGradeRequest:
+      type: object
+      required: [examinationId, studentId, marksObtained]
+      properties:
+        examinationId:
+          type: integer
+          format: int64
+        studentId:
+          type: integer
+          format: int64
+        marksObtained:
+          type: number
+        grade:
+          type: string
+        remarks:
+          type: string
+
+    StudentEnrollmentDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        studentId:
+          type: integer
+          format: int64
+        studentName:
+          type: string
+        rollNumber:
+          type: string
+        subjectId:
+          type: integer
+        subjectCode:
+          type: string
+        subjectTitle:
+          type: string
+        academicTerm:
+          type: string
+        status:
+          type: string
+          enum: [ENROLLED, COMPLETED, DROPPED]
+        enrolledAt:
+          type: string
+          format: date-time
 
     StudyMaterialDto:
       type: object
@@ -455,4 +770,371 @@ paths:
           description: Users rejected
         '403':
           description: Admin access required
+
+  /auth/refresh:
+    post:
+      summary: Refresh access token using refresh token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+      responses:
+        '200':
+          description: Rotated tokens issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Invalid or expired refresh token
+
+  /auth/logout:
+    post:
+      security:
+        - BearerAuth: []
+      summary: Revoke active refresh token session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+      responses:
+        '200':
+          description: Logged out and session invalidated
+
+  /users/profile:
+    get:
+      security:
+        - BearerAuth: []
+      summary: Get active user profile
+      responses:
+        '200':
+          description: User profile details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDto'
+    put:
+      security:
+        - BearerAuth: []
+      summary: Update user profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileRequest'
+      responses:
+        '200':
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDto'
+
+  /enrollments:
+    post:
+      security:
+        - BearerAuth: []
+      summary: Enroll student into an academic subject
+      parameters:
+        - name: studentId
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: subjectId
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: term
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Student successfully enrolled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentEnrollmentDto'
+
+  /enrollments/student/{studentId}:
+    get:
+      security:
+        - BearerAuth: []
+      summary: Get student enrollments
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: List of enrollments
+
+  /enrollments/subject/{subjectId}:
+    get:
+      security:
+        - BearerAuth: []
+      summary: Get subject class roster
+      parameters:
+        - name: subjectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of student enrollments in subject
+
+  /assignments:
+    post:
+      security:
+        - BearerAuth: []
+      summary: Create new coursework assignment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAssignmentRequest'
+      responses:
+        '200':
+          description: Assignment created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssignmentDto'
+
+  /assignments/subject/{subjectId}:
+    get:
+      security:
+        - BearerAuth: []
+      summary: Get paged assignments for a subject
+      parameters:
+        - name: subjectId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Paged assignments
+
+  /assignments/{id}/submit:
+    post:
+      security:
+        - BearerAuth: []
+      summary: Submit assignment solution
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitAssignmentRequest'
+      responses:
+        '200':
+          description: Submission recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssignmentSubmissionDto'
+
+  /assignments/{id}/submissions:
+    get:
+      security:
+        - BearerAuth: []
+      summary: Get submissions for an assignment (instructor view)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: List of student submissions
+
+  /assignments/submissions/{id}/grade:
+    post:
+      security:
+        - BearerAuth: []
+      summary: Grade assignment submission
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GradeSubmissionRequest'
+      responses:
+        '200':
+          description: Submission graded
+
+  /sessions:
+    post:
+      security:
+        - BearerAuth: []
+      summary: Schedule live classroom session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateLiveSessionRequest'
+      responses:
+        '200':
+          description: Session scheduled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LiveSessionDto'
+
+  /sessions/subject/{subjectId}:
+    get:
+      security:
+        - BearerAuth: []
+      summary: Get paged live sessions for a subject
+      parameters:
+        - name: subjectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Paged live sessions
+
+  /sessions/{id}/status:
+    patch:
+      security:
+        - BearerAuth: []
+      summary: Update session status (LIVE, COMPLETED, CANCELLED)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: status
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [SCHEDULED, LIVE, COMPLETED, CANCELLED]
+      responses:
+        '200':
+          description: Status updated
+
+  /examinations:
+    post:
+      security:
+        - BearerAuth: []
+      summary: Schedule formal examination
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateExaminationRequest'
+      responses:
+        '200':
+          description: Examination scheduled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExaminationDto'
+
+  /examinations/subject/{subjectId}:
+    get:
+      security:
+        - BearerAuth: []
+      summary: Get examinations for a subject
+      parameters:
+        - name: subjectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Paged examinations
+
+  /examinations/grade:
+    post:
+      security:
+        - BearerAuth: []
+      summary: Record grade for an examination
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecordGradeRequest'
+      responses:
+        '200':
+          description: Grade recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExaminationResultDto'
+
+  /examinations/{id}/results:
+    get:
+      security:
+        - BearerAuth: []
+      summary: Get all results for an examination (instructor)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Results list
+
+  /examinations/results/my:
+    get:
+      security:
+        - BearerAuth: []
+      summary: Get student transcript of results
+      responses:
+        '200':
+          description: Personal results list
 

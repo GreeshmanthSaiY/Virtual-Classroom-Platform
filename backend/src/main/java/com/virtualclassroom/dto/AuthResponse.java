@@ -10,6 +10,7 @@ public class AuthResponse {
     private String fullName;
     private String role;
     private String status;
+    private String refreshToken;
 
     public AuthResponse() {}
 
@@ -37,6 +38,8 @@ public class AuthResponse {
     public void setRole(String role) { this.role = role; }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
+    public String getRefreshToken() { return refreshToken; }
+    public void setRefreshToken(String refreshToken) { this.refreshToken = refreshToken; }
 
     public static Builder builder() {
         return new Builder();
@@ -50,6 +53,7 @@ public class AuthResponse {
         private String fullName;
         private String role;
         private String status;
+        private String refreshToken;
 
         public Builder token(String token) {
             this.token = token;
@@ -79,9 +83,15 @@ public class AuthResponse {
             this.status = status;
             return this;
         }
+        public Builder refreshToken(String refreshToken) {
+            this.refreshToken = refreshToken;
+            return this;
+        }
 
         public AuthResponse build() {
-            return new AuthResponse(token, tokenType, id, email, fullName, role, status);
+            AuthResponse response = new AuthResponse(token, tokenType, id, email, fullName, role, status);
+            response.setRefreshToken(refreshToken);
+            return response;
         }
     }
 }

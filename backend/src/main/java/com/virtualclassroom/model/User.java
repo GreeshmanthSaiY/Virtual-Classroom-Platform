@@ -34,6 +34,12 @@ public class User {
     @Column(name = "rejection_reason", columnDefinition = "TEXT")
     private String rejectionReason;
 
+    @Column(name = "avatar_url", length = 500)
+    private String avatarUrl;
+
+    @Column(name = "phone_number", length = 30)
+    private String phoneNumber;
+
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private StudentProfile studentProfile;
 
@@ -71,6 +77,8 @@ public class User {
         private Role role;
         private UserStatus status = UserStatus.PENDING;
         private String rejectionReason;
+        private String avatarUrl;
+        private String phoneNumber;
 
         public Builder id(Long id) { this.id = id; return this; }
         public Builder email(String email) { this.email = email; return this; }
@@ -79,10 +87,14 @@ public class User {
         public Builder role(Role role) { this.role = role; return this; }
         public Builder status(UserStatus status) { this.status = status; return this; }
         public Builder rejectionReason(String reason) { this.rejectionReason = reason; return this; }
+        public Builder avatarUrl(String avatarUrl) { this.avatarUrl = avatarUrl; return this; }
+        public Builder phoneNumber(String phoneNumber) { this.phoneNumber = phoneNumber; return this; }
 
         public User build() {
             User user = new User(id, email, passwordHash, fullName, role, status);
             user.setRejectionReason(rejectionReason);
+            user.setAvatarUrl(avatarUrl);
+            user.setPhoneNumber(phoneNumber);
             return user;
         }
     }
@@ -101,6 +113,10 @@ public class User {
     public void setStatus(UserStatus status) { this.status = status; }
     public String getRejectionReason() { return rejectionReason; }
     public void setRejectionReason(String rejectionReason) { this.rejectionReason = rejectionReason; }
+    public String getAvatarUrl() { return avatarUrl; }
+    public void setAvatarUrl(String avatarUrl) { this.avatarUrl = avatarUrl; }
+    public String getPhoneNumber() { return phoneNumber; }
+    public void setPhoneNumber(String phoneNumber) { this.phoneNumber = phoneNumber; }
     public StudentProfile getStudentProfile() { return studentProfile; }
     public void setStudentProfile(StudentProfile studentProfile) { this.studentProfile = studentProfile; }
     public FacultyProfile getFacultyProfile() { return facultyProfile; }

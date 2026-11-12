@@ -64,4 +64,24 @@ public class AuthController {
         UserDto user = authService.getCurrentUser(principal);
         return ResponseEntity.ok(ApiResponse.success(user, "Profile retrieved successfully"));
     }
+
+    @PostMapping("/refresh")
+    @Operation(summary = "Rotate refresh token and issue new JWT access token")
+    public ResponseEntity<ApiResponse<AuthResponse>> refresh(
+            @Valid @RequestBody RefreshTokenRequest request,
+            HttpServletRequest servletRequest
+    ) {
+        String clientIp = servletRequest.getRemoteAddr();
+        AuthResponse response = authService.refreshToken(request.getRefreshToken(), clientIp);
+        return ResponseEntity.ok(ApiResponse.success(response, "Token refreshed successfully"));
+    }
+
+    @PostMapping("/logout")
+    @Operation(summary = "Revoke refresh token and log out")
+    public ResponseEntity<ApiResponse<Void>> logout(
+            @Valid @RequestBody RefreshTokenRequest request
+    ) {
+        authService.revokeRefreshToken(request.getRefreshToken());
+        return ResponseEntity.ok(ApiResponse.success(null, "Logged out successfully"));
+    }
 }

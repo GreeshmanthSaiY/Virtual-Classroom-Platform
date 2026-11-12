@@ -68,6 +68,21 @@ public class JwtTokenProvider {
                 .compact();
     }
 
+    public String generateTokenFromUser(com.virtualclassroom.model.User user) {
+        Date now = new Date();
+        Date expiryDate = new Date(now.getTime() + jwtExpirationMs);
+
+        return Jwts.builder()
+                .subject(Long.toString(user.getId()))
+                .claim("email", user.getEmail())
+                .claim("role", user.getRole().name())
+                .claim("name", user.getFullName())
+                .issuedAt(now)
+                .expiration(expiryDate)
+                .signWith(key)
+                .compact();
+    }
+
     public Long getUserIdFromJWT(String token) {
         Claims claims = Jwts.parser()
                 .verifyWith(key)

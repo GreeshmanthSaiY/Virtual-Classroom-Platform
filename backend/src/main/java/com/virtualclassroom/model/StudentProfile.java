@@ -25,6 +25,9 @@ public class StudentProfile {
     @Column(name = "current_year", nullable = false)
     private Integer currentYear;
 
+    @Column(columnDefinition = "TEXT")
+    private String bio;
+
     public StudentProfile() {}
 
     public StudentProfile(User user, String rollNumber, Course course, Integer currentYear) {
@@ -42,12 +45,18 @@ public class StudentProfile {
         private String rollNumber;
         private Course course;
         private Integer currentYear;
+        private String bio;
 
         public Builder user(User user) { this.user = user; return this; }
         public Builder rollNumber(String rollNumber) { this.rollNumber = rollNumber; return this; }
         public Builder course(Course course) { this.course = course; return this; }
         public Builder currentYear(Integer currentYear) { this.currentYear = currentYear; return this; }
-        public StudentProfile build() { return new StudentProfile(user, rollNumber, course, currentYear); }
+        public Builder bio(String bio) { this.bio = bio; return this; }
+        public StudentProfile build() {
+            StudentProfile profile = new StudentProfile(user, rollNumber, course, currentYear);
+            profile.setBio(bio);
+            return profile;
+        }
     }
 
     public Long getUserId() { return userId; }
@@ -60,4 +69,6 @@ public class StudentProfile {
     public void setCourse(Course course) { this.course = course; }
     public Integer getCurrentYear() { return currentYear; }
     public void setCurrentYear(Integer currentYear) { this.currentYear = currentYear; }
+    public String getBio() { return bio; }
+    public void setBio(String bio) { this.bio = bio; }
 }

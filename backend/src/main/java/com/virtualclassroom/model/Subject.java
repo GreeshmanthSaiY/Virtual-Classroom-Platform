@@ -23,6 +23,15 @@ public class Subject {
     @Column(name = "year_level", nullable = false)
     private Integer yearLevel;
 
+    @Column(nullable = false)
+    private Integer semester = 1;
+
+    @Column(nullable = false)
+    private Integer credits = 3;
+
+    @Column(columnDefinition = "TEXT")
+    private String description;
+
     public Subject() {}
 
     public Subject(Integer id, Course course, String code, String title, Integer yearLevel) {
@@ -41,13 +50,25 @@ public class Subject {
         private String code;
         private String title;
         private Integer yearLevel;
+        private Integer semester = 1;
+        private Integer credits = 3;
+        private String description;
 
         public Builder id(Integer id) { this.id = id; return this; }
         public Builder course(Course course) { this.course = course; return this; }
         public Builder code(String code) { this.code = code; return this; }
         public Builder title(String title) { this.title = title; return this; }
         public Builder yearLevel(Integer yearLevel) { this.yearLevel = yearLevel; return this; }
-        public Subject build() { return new Subject(id, course, code, title, yearLevel); }
+        public Builder semester(Integer semester) { this.semester = semester; return this; }
+        public Builder credits(Integer credits) { this.credits = credits; return this; }
+        public Builder description(String description) { this.description = description; return this; }
+        public Subject build() {
+            Subject subject = new Subject(id, course, code, title, yearLevel);
+            subject.setSemester(semester != null ? semester : 1);
+            subject.setCredits(credits != null ? credits : 3);
+            subject.setDescription(description);
+            return subject;
+        }
     }
 
     public Integer getId() { return id; }
@@ -60,4 +81,10 @@ public class Subject {
     public void setTitle(String title) { this.title = title; }
     public Integer getYearLevel() { return yearLevel; }
     public void setYearLevel(Integer yearLevel) { this.yearLevel = yearLevel; }
+    public Integer getSemester() { return semester; }
+    public void setSemester(Integer semester) { this.semester = semester; }
+    public Integer getCredits() { return credits; }
+    public void setCredits(Integer credits) { this.credits = credits; }
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
 }

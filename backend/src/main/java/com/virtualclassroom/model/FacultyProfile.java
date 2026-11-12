@@ -24,6 +24,15 @@ public class FacultyProfile {
     @Column(nullable = false, length = 100)
     private String department;
 
+    @Column(length = 100)
+    private String designation = "Faculty Instructor";
+
+    @Column(name = "office_hours", length = 100)
+    private String officeHours;
+
+    @Column(columnDefinition = "TEXT")
+    private String bio;
+
     @OneToMany(mappedBy = "facultyProfile", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<FacultySubjectAssignment> subjectAssignments = new ArrayList<>();
 
@@ -42,11 +51,23 @@ public class FacultyProfile {
         private User user;
         private String employeeId;
         private String department;
+        private String designation = "Faculty Instructor";
+        private String officeHours;
+        private String bio;
 
         public Builder user(User user) { this.user = user; return this; }
         public Builder employeeId(String employeeId) { this.employeeId = employeeId; return this; }
         public Builder department(String department) { this.department = department; return this; }
-        public FacultyProfile build() { return new FacultyProfile(user, employeeId, department); }
+        public Builder designation(String designation) { this.designation = designation; return this; }
+        public Builder officeHours(String officeHours) { this.officeHours = officeHours; return this; }
+        public Builder bio(String bio) { this.bio = bio; return this; }
+        public FacultyProfile build() {
+            FacultyProfile profile = new FacultyProfile(user, employeeId, department);
+            profile.setDesignation(designation);
+            profile.setOfficeHours(officeHours);
+            profile.setBio(bio);
+            return profile;
+        }
     }
 
     public Long getUserId() { return userId; }
@@ -57,6 +78,12 @@ public class FacultyProfile {
     public void setEmployeeId(String employeeId) { this.employeeId = employeeId; }
     public String getDepartment() { return department; }
     public void setDepartment(String department) { this.department = department; }
+    public String getDesignation() { return designation; }
+    public void setDesignation(String designation) { this.designation = designation; }
+    public String getOfficeHours() { return officeHours; }
+    public void setOfficeHours(String officeHours) { this.officeHours = officeHours; }
+    public String getBio() { return bio; }
+    public void setBio(String bio) { this.bio = bio; }
     public List<FacultySubjectAssignment> getSubjectAssignments() { return subjectAssignments; }
     public void setSubjectAssignments(List<FacultySubjectAssignment> subjectAssignments) { this.subjectAssignments = subjectAssignments; }
 }

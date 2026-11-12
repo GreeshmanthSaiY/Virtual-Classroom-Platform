@@ -16,6 +16,8 @@ public class UserDto {
     private String department;
     private String courseName;
     private Integer currentYear;
+    private String avatarUrl;
+    private String phoneNumber;
     private Instant createdAt;
 
     public UserDto() {}
@@ -57,6 +59,10 @@ public class UserDto {
     public void setCourseName(String courseName) { this.courseName = courseName; }
     public Integer getCurrentYear() { return currentYear; }
     public void setCurrentYear(Integer currentYear) { this.currentYear = currentYear; }
+    public String getAvatarUrl() { return avatarUrl; }
+    public void setAvatarUrl(String avatarUrl) { this.avatarUrl = avatarUrl; }
+    public String getPhoneNumber() { return phoneNumber; }
+    public void setPhoneNumber(String phoneNumber) { this.phoneNumber = phoneNumber; }
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
 
@@ -76,6 +82,8 @@ public class UserDto {
         private String department;
         private String courseName;
         private Integer currentYear;
+        private String avatarUrl;
+        private String phoneNumber;
         private Instant createdAt;
 
         public UserDtoBuilder id(Long id) {
@@ -122,14 +130,26 @@ public class UserDto {
             this.currentYear = currentYear;
             return this;
         }
+        public UserDtoBuilder avatarUrl(String avatarUrl) {
+            this.avatarUrl = avatarUrl;
+            return this;
+        }
+        public UserDtoBuilder phoneNumber(String phoneNumber) {
+            this.phoneNumber = phoneNumber;
+            return this;
+        }
         public UserDtoBuilder createdAt(Instant createdAt) {
             this.createdAt = createdAt;
             return this;
         }
 
         public UserDto build() {
-            return new UserDto(id, email, fullName, role, status, rejectionReason, rollNumber, employeeId, department, courseName, currentYear, createdAt);
+            UserDto dto = new UserDto(id, email, fullName, role, status, rejectionReason, rollNumber, employeeId, department, courseName, currentYear, createdAt);
+            dto.setAvatarUrl(avatarUrl);
+            dto.setPhoneNumber(phoneNumber);
+            return dto;
         }
     }
+
     public static class Builder extends UserDtoBuilder {}
 }

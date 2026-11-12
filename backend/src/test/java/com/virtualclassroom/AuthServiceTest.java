@@ -48,6 +48,8 @@ class AuthServiceTest {
     private PasswordEncoder passwordEncoder;
     @Mock
     private AuditLogService auditLogService;
+    @Mock
+    private RefreshTokenRepository refreshTokenRepository;
 
     private JwtTokenProvider tokenProvider;
     private AuthService authService;
@@ -69,7 +71,8 @@ class AuthServiceTest {
                 assignmentRepository,
                 passwordEncoder,
                 tokenProvider,
-                auditLogService
+                auditLogService,
+                refreshTokenRepository
         );
 
         approvedStudent = User.builder()
@@ -184,5 +187,50 @@ class AuthServiceTest {
         assertEquals("ROLE_STUDENT", result.getRole());
         assertEquals("ROLL-999", result.getRollNumber());
         verify(studentProfileRepository, times(1)).save(any(StudentProfile.class));
+    }
+
+    @Test
+    @DisplayName("Refresh token rotation issues new access and refresh token, revoking old")
+    void refreshToken_ValidToken_RotatesSuccessfully() {
+        String oldRawToken = "valid-refresh-token-xyz";
+        RefreshToken existingToken = RefreshToken.builder()
+                .id(1L)
+                .tokenHash(oldRawToken)
+                .user(approvedStudent)
+                .expiresAt(java.time.Instant.now().plusSeconds(3600))
+                .revoked(false)
+                .build();
+
+        when(refreshTokenRepository.findByTokenHash(oldRawToken)).thenReturn(Optional.of(existingToken));
+        when(refreshTokenRepository.save(any(RefreshToken.class))).thenAnswer(i -> i.getArgument(0));
+
+        AuthResponse response = authService.refreshToken(oldRawToken, "127.0.0.1");
+
+        assertNotNull(response);
+        assertNotNull(response.getToken());
+        assertNotNull(response.getRefreshToken());
+        assertNotEquals(oldRawToken, response.getRefreshToken());
+        assertTrue(existingToken.isRevoked());
+        verify(refreshTokenRepository, atLeastOnce()).save(any(RefreshToken.class));
+    }
+
+    @Test
+    @DisplayName("Revoke refresh token marks token as revoked")
+    void revokeRefreshToken_ValidToken_MarksAsRevoked() {
+        String rawToken = "token-to-revoke";
+        RefreshToken existingToken = RefreshToken.builder()
+                .id(2L)
+                .tokenHash(rawToken)
+                .user(approvedStudent)
+                .expiresAt(java.time.Instant.now().plusSeconds(3600))
+                .revoked(false)
+                .build();
+
+        when(refreshTokenRepository.findByTokenHash(rawToken)).thenReturn(Optional.of(existingToken));
+
+        authService.revokeRefreshToken(rawToken);
+
+        assertTrue(existingToken.isRevoked());
+        verify(refreshTokenRepository).save(existingToken);
     }
 }
