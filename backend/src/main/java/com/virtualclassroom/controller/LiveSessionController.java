@@ -61,7 +61,7 @@ public class LiveSessionController {
         return ResponseEntity.ok(ApiResponse.success(sessions, "Live sessions retrieved successfully"));
     }
 
-    @PutMapping("/{sessionId}/status")
+    @RequestMapping(value = "/{sessionId}/status", method = {RequestMethod.PUT, RequestMethod.PATCH})
     @PreAuthorize("hasAnyAuthority('ROLE_FACULTY', 'ROLE_ADMIN')")
     @Operation(summary = "Update session status (LIVE, COMPLETED, CANCELLED)")
     public ResponseEntity<ApiResponse<LiveSessionDto>> updateStatus(

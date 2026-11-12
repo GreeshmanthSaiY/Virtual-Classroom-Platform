@@ -45,7 +45,7 @@ public class EnrollmentController {
         return ResponseEntity.ok(ApiResponse.success(enrollment, "Successfully enrolled in subject"));
     }
 
-    @GetMapping("/my-courses")
+    @GetMapping({"/my-courses", "/my-subjects"})
     @PreAuthorize("hasAnyAuthority('ROLE_STUDENT', 'ROLE_ADMIN')")
     @Operation(summary = "Get list of subjects currently enrolled by the student")
     public ResponseEntity<ApiResponse<List<StudentEnrollmentDto>>> getMyEnrollments(

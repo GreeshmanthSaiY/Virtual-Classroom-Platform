@@ -66,7 +66,6 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/api/v1/auth/**",
-                                "/api/v1/courses/**",
                                 "/api/v1/storage/files/**",
                                 "/api-docs/**",
                                 "/v3/api-docs/**",
@@ -75,6 +74,8 @@ public class SecurityConfig {
                                 "/actuator/health",
                                 "/actuator/info"
                         ).permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/courses/**").permitAll()
+                        .requestMatchers("/api/v1/courses/*/archive", "/api/v1/courses/*/unarchive").hasAuthority("ROLE_ADMIN")
                         .requestMatchers("/api/v1/admin/**").hasAuthority("ROLE_ADMIN")
                         .requestMatchers("/api/v1/faculty/**").hasAnyAuthority("ROLE_FACULTY", "ROLE_ADMIN")
                         .requestMatchers("/api/v1/students/**").hasAnyAuthority("ROLE_STUDENT", "ROLE_ADMIN")

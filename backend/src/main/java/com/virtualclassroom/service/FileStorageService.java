@@ -40,6 +40,14 @@ public class FileStorageService {
             "application/x-zip-compressed"
     );
 
+    public static final Set<String> ALLOWED_BUCKETS = Set.of(
+            "academic-assets",
+            "study-materials",
+            "submissions",
+            "profile-photos",
+            "course-documents"
+    );
+
     private final String provider;
     private final String supabaseUrl;
     private final String supabaseKey;
@@ -47,14 +55,28 @@ public class FileStorageService {
     private final Path localBaseDir;
     private final long maxFileSizeBytes;
     private final RestTemplate restTemplate;
+    private final org.springframework.core.env.Environment environment;
 
+    public FileStorageService(
+            String provider,
+            String supabaseUrl,
+            String supabaseKey,
+            String supabaseBucket,
+            String localBaseDir,
+            long maxFileSizeBytes
+    ) {
+        this(provider, supabaseUrl, supabaseKey, supabaseBucket, localBaseDir, maxFileSizeBytes, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
     public FileStorageService(
             @Value("${app.storage.provider:local}") String provider,
             @Value("${app.storage.supabase.url:}") String supabaseUrl,
             @Value("${app.storage.supabase.key:}") String supabaseKey,
             @Value("${app.storage.supabase.bucket:academic-assets}") String supabaseBucket,
             @Value("${app.storage.local.base-dir:./uploads}") String localBaseDir,
-            @Value("${app.storage.max-file-size:52428800}") long maxFileSizeBytes
+            @Value("${app.storage.max-file-size:52428800}") long maxFileSizeBytes,
+            @org.springframework.beans.factory.annotation.Autowired(required = false) org.springframework.core.env.Environment environment
     ) {
         this.provider = (provider != null && !provider.isBlank()) ? provider : "local";
         this.supabaseUrl = (supabaseUrl != null) ? supabaseUrl.trim() : "";
@@ -63,6 +85,17 @@ public class FileStorageService {
         this.localBaseDir = Paths.get(localBaseDir != null ? localBaseDir : "./uploads").toAbsolutePath().normalize();
         this.maxFileSizeBytes = maxFileSizeBytes > 0 ? maxFileSizeBytes : 52428800; // 50MB default
         this.restTemplate = new RestTemplate();
+        this.environment = environment;
+
+        if (!ALLOWED_BUCKETS.contains(this.supabaseBucket)) {
+            throw new IllegalArgumentException("Configured storage bucket '" + this.supabaseBucket + "' is not in the approved bucket allowlist: " + ALLOWED_BUCKETS);
+        }
+
+        if (isProductionProfile()) {
+            if (!"supabase".equalsIgnoreCase(this.provider) || this.supabaseUrl.isBlank() || this.supabaseKey.isBlank()) {
+                throw new IllegalStateException("Production configuration error: Supabase cloud storage (SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY) is required in production profile. Local filesystem fallback is strictly disabled in production.");
+            }
+        }
 
         try {
             Files.createDirectories(this.localBaseDir);
@@ -88,11 +121,15 @@ public class FileStorageService {
 
         String sanitizedFilename = sanitizeFilename(file.getOriginalFilename());
         String folderPath = (folder != null && !folder.isBlank()) ? sanitizePathSegment(folder) : "general";
-        String storagePath = folderPath + "/" + UUID.randomUUID() + "-" + sanitizedFilename;
+        String userPrefix = (uploader != null && uploader.getId() != null) ? uploader.getId() + "/" : "";
+        String storagePath = folderPath + "/" + userPrefix + UUID.randomUUID() + "-" + sanitizedFilename;
 
         if (isSupabaseConfigured()) {
             return uploadToSupabase(file, storagePath, sanitizedFilename, contentType);
         } else {
+            if (isProductionProfile()) {
+                throw new IllegalStateException("Production environment cannot use local filesystem storage");
+            }
             return uploadToLocalStorage(file, storagePath, sanitizedFilename, contentType);
         }
     }
@@ -100,8 +137,9 @@ public class FileStorageService {
     public SignedUploadUrlResponse generateSignedUploadUrl(SignedUploadUrlRequest request, User uploader) {
         String sanitizedFilename = sanitizeFilename(request.getFilename());
         String folderPath = sanitizePathSegment(request.getFolder());
-        String storagePath = folderPath + "/" + UUID.randomUUID() + "-" + sanitizedFilename;
-        int expiry = request.getExpiresInSeconds() > 0 ? request.getExpiresInSeconds() : 3600;
+        String userPrefix = (uploader != null && uploader.getId() != null) ? uploader.getId() + "/" : "";
+        String storagePath = folderPath + "/" + userPrefix + UUID.randomUUID() + "-" + sanitizedFilename;
+        int expiry = Math.min(Math.max(request.getExpiresInSeconds() > 0 ? request.getExpiresInSeconds() : 3600, 60), 3600);
 
         if (isSupabaseConfigured()) {
             String apiUrl = supabaseUrl + "/storage/v1/object/upload/sign/" + supabaseBucket + "/" + storagePath;
@@ -125,7 +163,10 @@ public class FileStorageService {
                         .expiresInSeconds(expiry)
                         .build();
             } catch (Exception e) {
-                // Graceful fallback to local upload endpoint if remote Supabase fails
+                if (isProductionProfile()) {
+                    throw new IllegalStateException("Failed to generate signed upload URL on Supabase: " + e.getMessage(), e);
+                }
+                // Graceful fallback to local upload endpoint if remote Supabase fails in dev
             }
         }
 
@@ -144,7 +185,7 @@ public class FileStorageService {
         if (storagePath == null || storagePath.isBlank()) {
             throw new IllegalArgumentException("Storage path is required");
         }
-        int expiry = expirySeconds > 0 ? expirySeconds : 3600;
+        int expiry = Math.min(Math.max(expirySeconds > 0 ? expirySeconds : 3600, 60), 86400);
 
         if (isSupabaseConfigured()) {
             String apiUrl = supabaseUrl + "/storage/v1/object/sign/" + supabaseBucket + "/" + storagePath;
@@ -169,8 +210,22 @@ public class FileStorageService {
     }
 
     public void deleteFile(String storagePath) {
+        deleteFile(storagePath, null);
+    }
+
+    public void deleteFile(String storagePath, User actor) {
         if (storagePath == null || storagePath.isBlank()) {
             return;
+        }
+
+        if (actor != null && actor.getRole() != com.virtualclassroom.model.Role.ROLE_ADMIN) {
+            String userNamespace = "/" + actor.getId() + "/";
+            String userPrefix = actor.getId() + "/";
+            if (!storagePath.contains(userNamespace) && !storagePath.startsWith(userPrefix)) {
+                throw new org.springframework.security.access.AccessDeniedException(
+                        "Access denied: You are not authorized to delete files belonging to other users"
+                );
+            }
         }
 
         if (isSupabaseConfigured()) {
@@ -246,7 +301,10 @@ public class FileStorageService {
             ResponseEntity<String> response = restTemplate.exchange(apiUrl, HttpMethod.POST, entity, String.class);
 
             if (!response.getStatusCode().is2xxSuccessful()) {
-                // If Supabase upload fails, fall back locally to prevent user breakage
+                if (isProductionProfile()) {
+                    throw new IllegalStateException("Supabase upload failed with HTTP status: " + response.getStatusCode());
+                }
+                // If Supabase upload fails in dev, fall back locally to prevent user breakage
                 return uploadToLocalStorage(file, storagePath, filename, mimeType);
             }
 
@@ -260,9 +318,16 @@ public class FileStorageService {
                     .fileSizeBytes(file.getSize())
                     .build();
         } catch (Exception e) {
-            // Fall back locally
+            if (isProductionProfile()) {
+                throw new IllegalStateException("Failed to upload file to Supabase cloud storage: " + e.getMessage(), e);
+            }
+            // Fall back locally in dev
             return uploadToLocalStorage(file, storagePath, filename, mimeType);
         }
+    }
+
+    public boolean isProductionProfile() {
+        return environment != null && (environment.matchesProfiles("prod") || environment.matchesProfiles("production"));
     }
 
     public boolean isSupabaseConfigured() {

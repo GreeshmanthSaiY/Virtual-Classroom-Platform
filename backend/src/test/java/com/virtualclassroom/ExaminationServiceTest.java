@@ -135,6 +135,32 @@ class ExaminationServiceTest {
     }
 
     @Test
+    @DisplayName("Recording grade validates marks against total examination marks")
+    void recordGrade_ExceedsTotalMarks_ThrowsIllegalArgumentException() {
+        Examination exam = Examination.builder()
+                .id(700L)
+                .subject(subject)
+                .title("Midterm Exam")
+                .totalMarks(100)
+                .build();
+
+        RecordGradeRequest req = new RecordGradeRequest();
+        req.setExaminationId(700L);
+        req.setStudentId(200L);
+        req.setMarksObtained(BigDecimal.valueOf(120)); // Exceeds 100
+        req.setGrade("A+");
+
+        when(examinationRepository.findById(700L)).thenReturn(Optional.of(exam));
+        when(facultyAssignmentRepository.existsByFacultyIdAndSubjectId(100L, 10)).thenReturn(true);
+        when(userRepository.findById(200L)).thenReturn(Optional.of(studentUser));
+        when(enrollmentRepository.existsByStudentIdAndSubjectId(200L, 10)).thenReturn(true);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+                examinationService.recordGrade(req, facultyUser, "127.0.0.1"));
+        assertTrue(ex.getMessage().contains("exceed total examination marks"));
+    }
+
+    @Test
     @DisplayName("Student cannot view examinations for unenrolled subject")
     void getExaminations_UnenrolledSubject_ThrowsAccessDeniedException() {
         when(enrollmentRepository.existsByStudentIdAndSubjectId(200L, 10)).thenReturn(false);

@@ -184,6 +184,13 @@ public class AssignmentService {
             }
         }
 
+        if (request.getGradePoints() == null || request.getGradePoints() < 0) {
+            throw new IllegalArgumentException("Grade points cannot be negative");
+        }
+        if (submission.getAssignment().getMaxPoints() != null && request.getGradePoints() > submission.getAssignment().getMaxPoints()) {
+            throw new IllegalArgumentException("Grade points (" + request.getGradePoints() + ") exceed maximum allowable points (" + submission.getAssignment().getMaxPoints() + ")");
+        }
+
         submission.setGradePoints(request.getGradePoints());
         submission.setFeedback(request.getFeedback());
         submission.setGradedBy(facultyUser);

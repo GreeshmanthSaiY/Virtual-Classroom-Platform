@@ -137,6 +137,13 @@ public class ExaminationService {
             throw new IllegalArgumentException("Cannot record grade: Student is not enrolled in this academic subject");
         }
 
+        if (request.getMarksObtained() == null || request.getMarksObtained().compareTo(java.math.BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("Marks obtained cannot be negative");
+        }
+        if (examination.getTotalMarks() != null && request.getMarksObtained().compareTo(java.math.BigDecimal.valueOf(examination.getTotalMarks())) > 0) {
+            throw new IllegalArgumentException("Marks obtained (" + request.getMarksObtained() + ") exceed total examination marks (" + examination.getTotalMarks() + ")");
+        }
+
         ExaminationResult result = resultRepository.findByExaminationIdAndStudentId(examination.getId(), student.getId())
                 .orElse(ExaminationResult.builder()
                         .examination(examination)

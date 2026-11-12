@@ -208,6 +208,33 @@ class AssignmentServiceTest {
     }
 
     @Test
+    @DisplayName("Grading validates grade points against maximum allowed points")
+    void gradeSubmission_ExceedsMaxPoints_ThrowsIllegalArgumentException() {
+        Assignment assignment = Assignment.builder()
+                .id(500L)
+                .subject(subject)
+                .maxPoints(100)
+                .build();
+
+        AssignmentSubmission sub = AssignmentSubmission.builder()
+                .id(900L)
+                .assignment(assignment)
+                .student(studentUser)
+                .status(SubmissionStatus.SUBMITTED)
+                .build();
+
+        GradeSubmissionRequest req = new GradeSubmissionRequest();
+        req.setGradePoints(150); // Exceeds max 100
+
+        when(submissionRepository.findById(900L)).thenReturn(Optional.of(sub));
+        when(facultyAssignmentRepository.existsByFacultyIdAndSubjectId(100L, 10)).thenReturn(true);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+                assignmentService.gradeSubmission(900L, req, facultyUser, "127.0.0.1"));
+        assertTrue(ex.getMessage().contains("exceed maximum allowable points"));
+    }
+
+    @Test
     @DisplayName("Student cannot view assignments for unenrolled subject")
     void getAssignments_UnenrolledStudent_ThrowsAccessDeniedException() {
         when(enrollmentRepository.existsByStudentIdAndSubjectId(200L, 10)).thenReturn(false);

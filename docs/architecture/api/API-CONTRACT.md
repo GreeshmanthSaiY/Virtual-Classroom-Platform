@@ -50,16 +50,18 @@ Endpoints that return paged collections accept `page` (0-indexed, default 0), `s
 
 ### 2.1 Authentication & Token Management (`/api/v1/auth`)
 
+> **Client Security Note**: For browser clients, the rotated `refreshToken` is delivered exclusively via an `HttpOnly`, `SameSite=Strict`, `Secure` (in production) cookie, and is omitted (`null`) from the JSON payload to prevent XSS script access and client storage leakage. Native/mobile applications provide the header `X-Token-Transport: payload` or `X-Client-Type: mobile` to receive the token in the JSON body.
+
 | Method | Endpoint | Access | Request Body | Response Body | Description |
 |:---|:---|:---|:---|:---|:---|
-| `POST` | `/api/v1/auth/login` | Public | `LoginRequest` | `AuthResponse` | Authenticates user; returns JWT access token, rotated refresh token, and sets secure HttpOnly cookie. |
+| `POST` | `/api/v1/auth/login` | Public | `LoginRequest` | `AuthResponse` | Authenticates user; returns JWT access token, sets HttpOnly cookie (or returns payload token for mobile). |
 | `POST` | `/api/v1/auth/register/student` | Public | `RegisterStudentRequest`| `UserDto` | Registers student in `PENDING` review state. |
 | `POST` | `/api/v1/auth/register/faculty` | Public | `RegisterFacultyRequest`| `UserDto` | Registers faculty in `PENDING` review state. |
 | `POST` | `/api/v1/auth/refresh` | Public | `RefreshTokenRequest` (or cookie) | `AuthResponse` | Rotates refresh token (SHA-256 hashed) and issues fresh access token. |
 | `POST` | `/api/v1/auth/logout` | Public / Authenticated | `RefreshTokenRequest` (or cookie) | `200 OK` | Revokes refresh token session and clears HttpOnly cookie. |
 | `GET`  | `/api/v1/auth/me` | Authenticated | None | `UserDto` | Returns authenticated user principal profile. |
-| `POST` | `/api/v1/auth/forgot-password` | Public | `ForgotPasswordRequest` | `ApiResponse<String>` | Dispatches time-limited (15m) single-use password recovery token. |
-| `POST` | `/api/v1/auth/reset-password` | Public | `ResetPasswordRequest` | `ApiResponse<Void>` | Validates token, updates password, and terminates all active sessions. |
+| `POST` | `/api/v1/auth/forgot-password` | Public | `ForgotPasswordRequest` | `ApiResponse<String>` | Dispatches time-limited (15m) single-use password recovery token with enumeration defense. |
+| `POST` | `/api/v1/auth/reset-password` | Public | `ResetPasswordRequest` | `ApiResponse<Void>` | Validates token, updates password, and terminates all active sessions across devices. |
 | `POST` | `/api/v1/auth/change-password` | Authenticated | `ChangePasswordRequest` | `ApiResponse<Void>` | Verifies current password, changes password, and invalidates other sessions. |
 
 ### 2.2 User Profiles (`/api/v1/users`)
@@ -84,8 +86,8 @@ Endpoints that return paged collections accept `page` (0-indexed, default 0), `s
 
 | Method | Endpoint | Access | Request Body | Response Body | Description |
 |:---|:---|:---|:---|:---|:---|
-| `POST` | `/api/v1/enrollments` | Student / Admin | `EnrollRequest` | `StudentEnrollmentDto` | Enrolls student into subject matching degree & year. |
-| `GET`  | `/api/v1/enrollments/student/{studentId}` | Self / Admin | None | `List<StudentEnrollmentDto>` | Lists subjects enrolled by student. |
+| `POST` | `/api/v1/enrollments` | Student / Admin | `subjectId`, `term` (param) | `StudentEnrollmentDto` | Enrolls student into subject matching degree & year. |
+| `GET`  | `/api/v1/enrollments/my-courses` | Student / Admin | None | `List<StudentEnrollmentDto>` | Lists subjects enrolled by student (alias: `/my-subjects`). |
 | `GET`  | `/api/v1/enrollments/subject/{subjectId}` | Faculty / Admin | None | `List<StudentEnrollmentDto>` | Returns class roster for an academic subject. |
 
 ### 2.5 Coursework & Submissions (`/api/v1/assignments`)
@@ -94,11 +96,10 @@ Endpoints that return paged collections accept `page` (0-indexed, default 0), `s
 |:---|:---|:---|:---|:---|:---|
 | `POST` | `/api/v1/assignments` | Faculty (Assigned) / Admin | `CreateAssignmentRequest` | `AssignmentDto` | Creates assignment with due date, rubrics, max points, and notifies enrolled students. |
 | `GET`  | `/api/v1/assignments/subject/{subjectId}` | Enrolled / Assigned / Admin | Paging | `PageResponse<AssignmentDto>` | Retrieves paged list of subject assignments. |
-| `GET`  | `/api/v1/assignments/{id}` | Enrolled / Assigned / Admin | None | `AssignmentDto` | Retrieves assignment details. |
-| `POST` | `/api/v1/assignments/{id}/submit` | Enrolled Student | `SubmitAssignmentRequest` | `AssignmentSubmissionDto` | Submits coursework solution (file URL / text). |
+| `POST` | `/api/v1/assignments/submit` | Enrolled Student | `SubmitAssignmentRequest` | `AssignmentSubmissionDto` | Submits coursework solution (file URL / text; alias: `/{id}/submit`). |
 | `GET`  | `/api/v1/assignments/{id}/submissions` | Assigned Faculty / Admin | None | `List<AssignmentSubmissionDto>` | Instructor view of all submissions. |
-| `POST` | `/api/v1/assignments/submissions/{id}/grade` | Assigned Faculty / Admin | `GradeSubmissionRequest` | `AssignmentSubmissionDto` | Records grade points, feedback, and notifies student. |
-| `GET`  | `/api/v1/assignments/submissions/my` | Student | None | `List<AssignmentSubmissionDto>` | Portfolio of student's own submissions. |
+| `PUT`  | `/api/v1/assignments/submissions/{id}/grade` | Assigned Faculty / Admin | `GradeSubmissionRequest` | `AssignmentSubmissionDto` | Records grade points (bounded to maxPoints), feedback, and notifies student (supports PUT/POST). |
+| `GET`  | `/api/v1/assignments/my-submissions` | Student | None | `List<AssignmentSubmissionDto>` | Portfolio of student's own submissions (alias: `/submissions/my`). |
 
 ### 2.6 Live Classroom Sessions (`/api/v1/sessions`)
 
@@ -108,8 +109,7 @@ Endpoints that return paged collections accept `page` (0-indexed, default 0), `s
 |:---|:---|:---|:---|:---|:---|
 | `POST` | `/api/v1/sessions` | Assigned Faculty / Admin | `CreateLiveSessionRequest` | `LiveSessionDto` | Schedules live lecture meeting (Jitsi / WebRTC room link) and checks for time overlaps. |
 | `GET`  | `/api/v1/sessions/subject/{subjectId}` | Enrolled / Assigned / Admin | Paging | `PageResponse<LiveSessionDto>` | Paged schedule of upcoming and completed sessions. |
-| `GET`  | `/api/v1/sessions/{id}` | Enrolled / Assigned / Admin | None | `LiveSessionDto` | Retrieves meeting details and connection link. |
-| `PATCH`| `/api/v1/sessions/{id}/status` | Host Faculty / Admin | `{ "status": "LIVE" }` | `LiveSessionDto` | Updates lifecycle state (`SCHEDULED` -> `LIVE`/`CANCELLED`; `LIVE` -> `COMPLETED`/`CANCELLED`). |
+| `PUT/PATCH`| `/api/v1/sessions/{id}/status` | Host Faculty / Admin | `status` (param) | `LiveSessionDto` | Updates lifecycle state (`SCHEDULED` -> `LIVE`/`CANCELLED`; `LIVE` -> `COMPLETED`/`CANCELLED`). |
 
 ### 2.7 Examinations & Grading (`/api/v1/examinations`)
 
@@ -117,10 +117,9 @@ Endpoints that return paged collections accept `page` (0-indexed, default 0), `s
 |:---|:---|:---|:---|:---|:---|
 | `POST` | `/api/v1/examinations` | Assigned Faculty / Admin | `CreateExaminationRequest` | `ExaminationDto` | Schedules formal midterm, final, or quiz exam. |
 | `GET`  | `/api/v1/examinations/subject/{subjectId}` | Enrolled / Assigned / Admin | Paging | `PageResponse<ExaminationDto>` | Paged list of scheduled examinations. |
-| `GET`  | `/api/v1/examinations/{id}` | Enrolled / Assigned / Admin | None | `ExaminationDto` | Retrieves exam duration, instructions, max marks. |
-| `POST` | `/api/v1/examinations/grade` | Assigned Faculty / Admin | `RecordGradeRequest` | `ExaminationResultDto` | Records student marks, grade letter, remarks, and notifies student. |
+| `POST` | `/api/v1/examinations/grades` | Assigned Faculty / Admin | `RecordGradeRequest` | `ExaminationResultDto` | Records student marks (bounded to totalMarks), grade letter, remarks, and notifies student (alias: `/grade`). |
 | `GET`  | `/api/v1/examinations/{id}/results` | Assigned Faculty / Admin | None | `List<ExaminationResultDto>` | Complete class grading ledger for an exam. |
-| `GET`  | `/api/v1/examinations/results/my` | Student | None | `List<ExaminationResultDto>` | Student's certified academic transcript results. |
+| `GET`  | `/api/v1/examinations/my-results` | Student | None | `List<ExaminationResultDto>` | Student's certified academic transcript results (alias: `/results/my`). |
 
 ### 2.8 Administrative Controls (`/api/v1/admin`)
 

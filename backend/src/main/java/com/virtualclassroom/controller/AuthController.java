@@ -21,9 +21,19 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+    private final boolean cookieSecure;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public AuthController(
+            AuthService authService,
+            @org.springframework.beans.factory.annotation.Value("${app.security.cookie-secure:false}") boolean cookieSecure
+    ) {
+        this.authService = authService;
+        this.cookieSecure = cookieSecure;
+    }
 
     public AuthController(AuthService authService) {
-        this.authService = authService;
+        this(authService, false);
     }
 
     @PostMapping("/login")
@@ -37,6 +47,9 @@ public class AuthController {
         AuthResponse response = authService.login(request, clientIp);
         if (response.getRefreshToken() != null) {
             setRefreshTokenCookie(servletResponse, response.getRefreshToken());
+            if (!isPayloadTransportRequested(servletRequest)) {
+                response.setRefreshToken(null);
+            }
         }
         return ResponseEntity.ok(ApiResponse.success(response, "Login successful"));
     }
@@ -92,6 +105,9 @@ public class AuthController {
         AuthResponse response = authService.refreshToken(token, clientIp);
         if (response.getRefreshToken() != null) {
             setRefreshTokenCookie(servletResponse, response.getRefreshToken());
+            if (!isPayloadTransportRequested(servletRequest)) {
+                response.setRefreshToken(null);
+            }
         }
         return ResponseEntity.ok(ApiResponse.success(response, "Token refreshed successfully"));
     }
@@ -153,7 +169,7 @@ public class AuthController {
     private void setRefreshTokenCookie(HttpServletResponse response, String refreshToken) {
         ResponseCookie cookie = ResponseCookie.from("refreshToken", refreshToken)
                 .httpOnly(true)
-                .secure(false) // Allows localhost testing; in production can be overridden via gateway/HTTPS
+                .secure(cookieSecure)
                 .path("/api/v1/auth")
                 .maxAge(7 * 24 * 60 * 60)
                 .sameSite("Strict")
@@ -164,11 +180,18 @@ public class AuthController {
     private void clearRefreshTokenCookie(HttpServletResponse response) {
         ResponseCookie cookie = ResponseCookie.from("refreshToken", "")
                 .httpOnly(true)
-                .secure(false)
+                .secure(cookieSecure)
                 .path("/api/v1/auth")
                 .maxAge(0)
                 .sameSite("Strict")
                 .build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+    }
+
+    private boolean isPayloadTransportRequested(HttpServletRequest request) {
+        if (request == null) return false;
+        String transport = request.getHeader("X-Token-Transport");
+        String clientType = request.getHeader("X-Client-Type");
+        return "payload".equalsIgnoreCase(transport) || "mobile".equalsIgnoreCase(clientType);
     }
 }

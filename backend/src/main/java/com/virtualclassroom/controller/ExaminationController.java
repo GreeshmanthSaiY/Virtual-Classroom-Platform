@@ -64,7 +64,7 @@ public class ExaminationController {
         return ResponseEntity.ok(ApiResponse.success(exams, "Examinations retrieved successfully"));
     }
 
-    @PostMapping("/grades")
+    @PostMapping({"/grades", "/grade"})
     @PreAuthorize("hasAnyAuthority('ROLE_FACULTY', 'ROLE_ADMIN')")
     @Operation(summary = "Record or update official examination grade for an enrolled student")
     public ResponseEntity<ApiResponse<ExaminationResultDto>> recordGrade(
@@ -92,7 +92,7 @@ public class ExaminationController {
         return ResponseEntity.ok(ApiResponse.success(results, "Examination results retrieved successfully"));
     }
 
-    @GetMapping("/my-results")
+    @GetMapping({"/my-results", "/results/my"})
     @PreAuthorize("hasAnyAuthority('ROLE_STUDENT', 'ROLE_ADMIN')")
     @Operation(summary = "Get current student's official examination results and grades")
     public ResponseEntity<ApiResponse<List<ExaminationResultDto>>> getMyResults(

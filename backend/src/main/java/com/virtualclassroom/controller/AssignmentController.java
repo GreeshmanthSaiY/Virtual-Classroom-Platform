@@ -65,14 +65,18 @@ public class AssignmentController {
         return ResponseEntity.ok(ApiResponse.success(assignments, "Assignments retrieved successfully"));
     }
 
-    @PostMapping("/submit")
+    @PostMapping({"/submit", "/{assignmentId}/submit"})
     @PreAuthorize("hasAnyAuthority('ROLE_STUDENT', 'ROLE_ADMIN')")
     @Operation(summary = "Submit a student solution for an assignment")
     public ResponseEntity<ApiResponse<AssignmentSubmissionDto>> submitAssignment(
+            @PathVariable(required = false) Long assignmentId,
             @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody SubmitAssignmentRequest request,
             HttpServletRequest servletRequest
     ) {
+        if (assignmentId != null && request.getAssignmentId() == null) {
+            request.setAssignmentId(assignmentId);
+        }
         User user = userRepository.findById(principal.getId())
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
         String clientIp = servletRequest.getRemoteAddr();
@@ -93,11 +97,11 @@ public class AssignmentController {
         return ResponseEntity.ok(ApiResponse.success(submissions, "Submissions retrieved successfully"));
     }
 
-    @PutMapping("/submissions/{submissionId}/grade")
+    @RequestMapping(value = {"/submissions/{submissionId}/grade", "/{assignmentId}/submissions/{submissionId}/grade"}, method = {RequestMethod.PUT, RequestMethod.POST})
     @PreAuthorize("hasAnyAuthority('ROLE_FACULTY', 'ROLE_ADMIN')")
     @Operation(summary = "Grade a student submission with score and feedback")
     public ResponseEntity<ApiResponse<AssignmentSubmissionDto>> gradeSubmission(
-            @PathVariable Long submissionId,
+            @PathVariable(name = "submissionId") Long submissionId,
             @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody GradeSubmissionRequest request,
             HttpServletRequest servletRequest
@@ -109,7 +113,7 @@ public class AssignmentController {
         return ResponseEntity.ok(ApiResponse.success(graded, "Submission graded successfully"));
     }
 
-    @GetMapping("/my-submissions")
+    @GetMapping({"/my-submissions", "/submissions/my"})
     @PreAuthorize("hasAnyAuthority('ROLE_STUDENT', 'ROLE_ADMIN')")
     @Operation(summary = "Get current student's assignment submissions and grades")
     public ResponseEntity<ApiResponse<List<AssignmentSubmissionDto>>> getMySubmissions(

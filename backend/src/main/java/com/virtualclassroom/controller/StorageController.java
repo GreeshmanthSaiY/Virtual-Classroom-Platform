@@ -103,8 +103,12 @@ public class StorageController {
     @DeleteMapping("/files")
     @PreAuthorize("hasAnyAuthority('ROLE_FACULTY', 'ROLE_ADMIN')")
     @Operation(summary = "Delete an uploaded file from storage")
-    public ResponseEntity<ApiResponse<Void>> deleteFile(@RequestParam("path") String storagePath) {
-        storageService.deleteFile(storagePath);
+    public ResponseEntity<ApiResponse<Void>> deleteFile(
+            @RequestParam("path") String storagePath,
+            @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        User user = (userRepository != null && principal != null) ? userRepository.getReferenceById(principal.getId()) : null;
+        storageService.deleteFile(storagePath, user);
         return ResponseEntity.ok(ApiResponse.success(null, "File deleted successfully"));
     }
 }
