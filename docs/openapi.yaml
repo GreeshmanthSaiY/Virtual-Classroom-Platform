@@ -1138,3 +1138,333 @@ paths:
         '200':
           description: Personal results list
 
+  /auth/forgot-password:
+    post:
+      summary: Initiate password recovery
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: Password reset instructions issued
+
+  /auth/reset-password:
+    post:
+      summary: Reset password with recovery token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, newPassword]
+              properties:
+                token:
+                  type: string
+                newPassword:
+                  type: string
+                  minLength: 8
+      responses:
+        '200':
+          description: Password reset successful
+
+  /auth/change-password:
+    post:
+      security:
+        - BearerAuth: []
+      summary: Change password for authenticated user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [oldPassword, newPassword]
+              properties:
+                oldPassword:
+                  type: string
+                newPassword:
+                  type: string
+                  minLength: 8
+      responses:
+        '200':
+          description: Password changed successfully
+
+  /admin/users/search:
+    get:
+      security:
+        - BearerAuth: []
+      summary: Search users with keyword, role and status filters
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+        - name: role
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paginated search results
+
+  /admin/users/{userId}/suspend:
+    post:
+      security:
+        - BearerAuth: []
+      summary: Suspend user account and terminate all active sessions
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: User suspended successfully
+
+  /admin/users/{userId}/reactivate:
+    post:
+      security:
+        - BearerAuth: []
+      summary: Reactivate suspended user account
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: User reactivated successfully
+
+  /admin/subjects/{subjectId}/assign-faculty:
+    post:
+      security:
+        - BearerAuth: []
+      summary: Assign faculty instructor to a subject
+      parameters:
+        - name: subjectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [facultyId]
+              properties:
+                facultyId:
+                  type: integer
+                  format: int64
+                academicTerm:
+                  type: string
+                  default: "2026-ACTIVE"
+      responses:
+        '200':
+          description: Faculty instructor assigned successfully
+
+  /courses/{courseId}/archive:
+    patch:
+      security:
+        - BearerAuth: []
+      summary: Archive an academic course (Admin only)
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Course archived successfully
+
+  /courses/{courseId}/unarchive:
+    patch:
+      security:
+        - BearerAuth: []
+      summary: Unarchive an academic course (Admin only)
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Course unarchived successfully
+
+  /students/dashboard:
+    get:
+      security:
+        - BearerAuth: []
+      summary: Get student academic dashboard
+      responses:
+        '200':
+          description: Student dashboard data
+
+  /faculty/dashboard:
+    get:
+      security:
+        - BearerAuth: []
+      summary: Get faculty academic dashboard
+      responses:
+        '200':
+          description: Faculty dashboard data
+
+  /faculty/subjects/{subjectId}/students:
+    get:
+      security:
+        - BearerAuth: []
+      summary: Inspect student roster for an assigned subject
+      parameters:
+        - name: subjectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Student roster list
+
+  /discussions/search:
+    get:
+      security:
+        - BearerAuth: []
+      summary: Search discussion threads by keyword
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+        - name: subjectId
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Discussion search results
+
+  /discussions/answers/{answerId}/endorse:
+    patch:
+      security:
+        - BearerAuth: []
+      summary: Faculty endorsement of high-quality answer
+      parameters:
+        - name: answerId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Answer endorsed successfully
+
+  /storage/upload:
+    post:
+      security:
+        - BearerAuth: []
+      summary: Upload file attachment to storage
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                folder:
+                  type: string
+      responses:
+        '200':
+          description: File uploaded successfully
+
+  /storage/signed-upload-url:
+    post:
+      security:
+        - BearerAuth: []
+      summary: Generate signed upload URL for client upload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [filename]
+              properties:
+                filename:
+                  type: string
+                folder:
+                  type: string
+                expiresInSeconds:
+                  type: integer
+      responses:
+        '200':
+          description: Signed URL generated
+
+  /storage/signed-download-url:
+    get:
+      security:
+        - BearerAuth: []
+      summary: Generate signed download URL
+      parameters:
+        - name: path
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: expiresIn
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Signed download URL generated
+
+  /storage/files:
+    delete:
+      security:
+        - BearerAuth: []
+      summary: Delete file from storage
+      parameters:
+        - name: path
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: File deleted successfully
+
+

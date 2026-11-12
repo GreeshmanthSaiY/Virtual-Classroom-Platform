@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class FlywayMigrationSafetyTest {
 
     @Test
-    @DisplayName("Scenario A: Fresh disposable PostgreSQL with V1, V2, V3 and V4 executes cleanly without demo users")
+    @DisplayName("Scenario A: Fresh disposable PostgreSQL with V1, V2, V3, V4 and V5 executes cleanly without demo users")
     void scenarioA_FreshPostgresDatabase_AppliesAllMigrationsCleanly() throws Exception {
         try (EmbeddedPostgres pg = EmbeddedPostgres.start()) {
             DataSource dataSource = pg.getDatabase("postgres", "postgres");
@@ -26,7 +26,7 @@ class FlywayMigrationSafetyTest {
                     .load();
 
             int applied = flyway.migrate().migrationsExecuted;
-            assertEquals(4, applied, "All 4 migrations (V1, V2, V3, V4) must execute on a fresh PostgreSQL database");
+            assertEquals(5, applied, "All 5 migrations (V1, V2, V3, V4, V5) must execute on a fresh PostgreSQL database");
 
             try (Connection conn = dataSource.getConnection();
                  Statement stmt = conn.createStatement()) {
@@ -52,25 +52,26 @@ class FlywayMigrationSafetyTest {
                     assertEquals(0, rs.getInt(1), "No demo users should remain after V3 migration");
                 }
 
-                // 3. Verify V4 schema expansion tables exist
-                String[] v4Tables = {
+                // 3. Verify V4 & V5 schema expansion tables exist
+                String[] allTables = {
                         "refresh_tokens",
                         "student_subject_enrollments",
                         "live_sessions",
                         "assignments",
                         "assignment_submissions",
                         "examinations",
-                        "examination_results"
+                        "examination_results",
+                        "password_reset_tokens"
                 };
-                for (String table : v4Tables) {
+                for (String table : allTables) {
                     try (ResultSet rs = stmt.executeQuery(
                             "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = '" + table + "')")) {
                         assertTrue(rs.next());
-                        assertTrue(rs.getBoolean(1), "Table '" + table + "' must be created by V4 migration");
+                        assertTrue(rs.getBoolean(1), "Table '" + table + "' must be created by migrations");
                     }
                 }
 
-                // 4. Verify V4 added columns exist
+                // 4. Verify V4 & V5 added columns exist
                 try (ResultSet rs = stmt.executeQuery(
                         "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'avatar_url')")) {
                     assertTrue(rs.next());
@@ -80,6 +81,16 @@ class FlywayMigrationSafetyTest {
                         "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'subjects' AND column_name = 'semester')")) {
                     assertTrue(rs.next());
                     assertTrue(rs.getBoolean(1), "Column 'semester' must exist on 'subjects'");
+                }
+                try (ResultSet rs = stmt.executeQuery(
+                        "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'courses' AND column_name = 'archived')")) {
+                    assertTrue(rs.next());
+                    assertTrue(rs.getBoolean(1), "Column 'archived' must exist on 'courses'");
+                }
+                try (ResultSet rs = stmt.executeQuery(
+                        "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'answers' AND column_name = 'is_endorsed')")) {
+                    assertTrue(rs.next());
+                    assertTrue(rs.getBoolean(1), "Column 'is_endorsed' must exist on 'answers'");
                 }
 
                 // 5. Verify legitimate user can be inserted and primary key sequence works
@@ -97,7 +108,7 @@ class FlywayMigrationSafetyTest {
     }
 
     @Test
-    @DisplayName("Scenario B: Existing PostgreSQL database with V1-V3 applied, followed by V4 upgrade preserves data and backfills")
+    @DisplayName("Scenario B: Existing PostgreSQL database with V1-V3 applied, followed by V4 & V5 upgrade preserves data and backfills")
     void scenarioB_ExistingPostgresWithLegitimateData_PreservedAfterV4() throws Exception {
         try (EmbeddedPostgres pg = EmbeddedPostgres.start()) {
             DataSource dataSource = pg.getDatabase("postgres", "postgres");
@@ -166,17 +177,17 @@ class FlywayMigrationSafetyTest {
                         "'Quantum Mechanics Lecture Notes', 'Official lecture notes', 'https://storage.university.edu/physics.pdf')");
             }
 
-            // Step 3: Now apply V4 upgrade (migrate to target 4)
-            Flyway flywayV4 = Flyway.configure()
+            // Step 3: Now apply V4 and V5 upgrade (migrate to target 5)
+            Flyway flywayV5 = Flyway.configure()
                     .dataSource(dataSource)
                     .locations("classpath:db/migration")
-                    .target("4")
+                    .target("5")
                     .load();
 
-            int appliedV4 = flywayV4.migrate().migrationsExecuted;
-            assertEquals(1, appliedV4, "V4 must execute on top of existing V3 database");
+            int appliedV4V5 = flywayV5.migrate().migrationsExecuted;
+            assertEquals(2, appliedV4V5, "V4 and V5 must execute on top of existing V3 database");
 
-            // Step 4: Verify that legitimate data is preserved AND V4 features work
+            // Step 4: Verify that legitimate data is preserved AND V4/V5 features work
             try (Connection conn = dataSource.getConnection();
                  Statement stmt = conn.createStatement()) {
 
@@ -220,6 +231,22 @@ class FlywayMigrationSafetyTest {
                     assertTrue(rs.next());
                     assertEquals("SUBMITTED", rs.getString("status"));
                     assertEquals("https://storage/hw1.py", rs.getString("file_url"));
+                }
+
+                // Verify V5 features in upgraded database: password reset token insert & course archival
+                stmt.executeUpdate(
+                        "INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) " +
+                        "VALUES (" + legitimateStudentId + ", 'mock_reset_hash_123', NOW() + INTERVAL '15 minutes')");
+
+                try (ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM password_reset_tokens WHERE user_id = " + legitimateStudentId)) {
+                    assertTrue(rs.next());
+                    assertEquals(1, rs.getInt(1), "Password reset token must be insertable");
+                }
+
+                stmt.executeUpdate("UPDATE courses SET archived = true WHERE code = 'BSC-CS'");
+                try (ResultSet rs = stmt.executeQuery("SELECT archived FROM courses WHERE code = 'BSC-CS'")) {
+                    assertTrue(rs.next());
+                    assertTrue(rs.getBoolean("archived"), "Course archival column must work");
                 }
             }
         }

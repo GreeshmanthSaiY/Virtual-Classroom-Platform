@@ -4,10 +4,16 @@ import com.virtualclassroom.dto.ApiResponse;
 import com.virtualclassroom.dto.CourseDto;
 import com.virtualclassroom.dto.DegreeDto;
 import com.virtualclassroom.dto.SubjectDto;
+import com.virtualclassroom.model.User;
+import com.virtualclassroom.repository.UserRepository;
+import com.virtualclassroom.security.UserPrincipal;
 import com.virtualclassroom.service.CourseService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,9 +24,16 @@ import java.util.List;
 public class CourseController {
 
     private final CourseService courseService;
+    private final UserRepository userRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public CourseController(CourseService courseService, UserRepository userRepository) {
+        this.courseService = courseService;
+        this.userRepository = userRepository;
+    }
 
     public CourseController(CourseService courseService) {
-        this.courseService = courseService;
+        this(courseService, null);
     }
 
 
@@ -53,5 +66,31 @@ public class CourseController {
     public ResponseEntity<ApiResponse<List<SubjectDto>>> getAllSubjects() {
         List<SubjectDto> subjects = courseService.getAllSubjects();
         return ResponseEntity.ok(ApiResponse.success(subjects, "All subjects retrieved successfully"));
+    }
+
+    @PatchMapping("/{courseId}/archive")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @Operation(summary = "Archive an academic course (Admin only)")
+    public ResponseEntity<ApiResponse<CourseDto>> archiveCourse(
+            @PathVariable Integer courseId,
+            @AuthenticationPrincipal UserPrincipal principal,
+            HttpServletRequest servletRequest
+    ) {
+        User admin = (userRepository != null && principal != null) ? userRepository.getReferenceById(principal.getId()) : null;
+        CourseDto course = courseService.archiveCourse(courseId, admin, servletRequest.getRemoteAddr());
+        return ResponseEntity.ok(ApiResponse.success(course, "Course archived successfully"));
+    }
+
+    @PatchMapping("/{courseId}/unarchive")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @Operation(summary = "Unarchive an academic course (Admin only)")
+    public ResponseEntity<ApiResponse<CourseDto>> unarchiveCourse(
+            @PathVariable Integer courseId,
+            @AuthenticationPrincipal UserPrincipal principal,
+            HttpServletRequest servletRequest
+    ) {
+        User admin = (userRepository != null && principal != null) ? userRepository.getReferenceById(principal.getId()) : null;
+        CourseDto course = courseService.unarchiveCourse(courseId, admin, servletRequest.getRemoteAddr());
+        return ResponseEntity.ok(ApiResponse.success(course, "Course unarchived successfully"));
     }
 }

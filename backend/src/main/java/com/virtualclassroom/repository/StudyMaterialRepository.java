@@ -15,5 +15,6 @@ public interface StudyMaterialRepository extends JpaRepository<StudyMaterial, Lo
     List<StudyMaterial> findByUploaderId(Long uploaderId);
     List<StudyMaterial> findByUploaderIdAndSubjectId(Long uploaderId, Integer subjectId);
     List<StudyMaterial> findBySubjectIdIn(List<Integer> subjectIds);
+    long countByUploaderId(Long uploaderId);
 }
 

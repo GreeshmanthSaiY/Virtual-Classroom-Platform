@@ -19,6 +19,7 @@ public interface LiveSessionRepository extends JpaRepository<LiveSession, Long> 
     Page<LiveSession> findBySubjectId(Integer subjectId, Pageable pageable);
     List<LiveSession> findByHostIdOrderByScheduledStartDesc(Long hostId);
     List<LiveSession> findBySubjectIdInAndStatusOrderByScheduledStartAsc(Collection<Integer> subjectIds, LiveSessionStatus status);
+    long countByStatus(LiveSessionStatus status);
 
     @Query("SELECT COUNT(s) > 0 FROM LiveSession s WHERE s.subject.id = :subjectId " +
            "AND s.status != 'CANCELLED' " +

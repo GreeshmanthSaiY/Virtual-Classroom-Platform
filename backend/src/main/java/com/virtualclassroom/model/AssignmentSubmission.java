@@ -72,6 +72,7 @@ public class AssignmentSubmission {
         private String feedback;
         private User gradedBy;
         private Instant gradedAt;
+        private Instant submittedAt;
         private SubmissionStatus status = SubmissionStatus.SUBMITTED;
 
         public Builder id(Long id) { this.id = id; return this; }
@@ -83,6 +84,7 @@ public class AssignmentSubmission {
         public Builder feedback(String feedback) { this.feedback = feedback; return this; }
         public Builder gradedBy(User gradedBy) { this.gradedBy = gradedBy; return this; }
         public Builder gradedAt(Instant gradedAt) { this.gradedAt = gradedAt; return this; }
+        public Builder submittedAt(Instant submittedAt) { this.submittedAt = submittedAt; return this; }
         public Builder status(SubmissionStatus status) { this.status = status; return this; }
         public AssignmentSubmission build() {
             AssignmentSubmission submission = new AssignmentSubmission(assignment, student, submissionText, fileUrl, status);
@@ -91,6 +93,9 @@ public class AssignmentSubmission {
             submission.setFeedback(feedback);
             submission.setGradedBy(gradedBy);
             submission.setGradedAt(gradedAt);
+            if (submittedAt != null) {
+                submission.setSubmittedAt(submittedAt);
+            }
             return submission;
         }
     }

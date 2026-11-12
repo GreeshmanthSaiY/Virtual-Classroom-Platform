@@ -64,6 +64,7 @@ public class Question {
         private String title;
         private String body;
         private Boolean isResolved = false;
+        private Instant createdAt;
 
         public Builder id(Long id) { this.id = id; return this; }
         public Builder subject(Subject subject) { this.subject = subject; return this; }
@@ -71,8 +72,13 @@ public class Question {
         public Builder title(String title) { this.title = title; return this; }
         public Builder body(String body) { this.body = body; return this; }
         public Builder isResolved(Boolean isResolved) { this.isResolved = isResolved; return this; }
+        public Builder createdAt(Instant createdAt) { this.createdAt = createdAt; return this; }
         public Question build() {
-            return new Question(id, subject, author, title, body, isResolved);
+            Question question = new Question(id, subject, author, title, body, isResolved);
+            if (createdAt != null) {
+                question.setCreatedAt(createdAt);
+            }
+            return question;
         }
     }
 

@@ -13,10 +13,15 @@ public class PlatformMetricsDto {
     private long totalLectures;
     private long totalQuestions;
     private long resolvedQuestions;
+    private long totalAssignments;
+    private long totalExaminations;
+    private long upcomingLiveSessions;
+    private long suspendedUsers;
+    private long approvedUsers;
 
     public PlatformMetricsDto() {}
 
-    public PlatformMetricsDto(long totalStudents, long totalFaculty, long pendingStudentApprovals, long pendingFacultyApprovals, long totalCourses, long totalSubjects, long totalMaterials, long totalLectures, long totalQuestions, long resolvedQuestions) {
+    public PlatformMetricsDto(long totalStudents, long totalFaculty, long pendingStudentApprovals, long pendingFacultyApprovals, long totalCourses, long totalSubjects, long totalMaterials, long totalLectures, long totalQuestions, long resolvedQuestions, long totalAssignments, long totalExaminations, long upcomingLiveSessions, long suspendedUsers, long approvedUsers) {
         this.totalStudents = totalStudents;
         this.totalFaculty = totalFaculty;
         this.pendingStudentApprovals = pendingStudentApprovals;
@@ -27,6 +32,11 @@ public class PlatformMetricsDto {
         this.totalLectures = totalLectures;
         this.totalQuestions = totalQuestions;
         this.resolvedQuestions = resolvedQuestions;
+        this.totalAssignments = totalAssignments;
+        this.totalExaminations = totalExaminations;
+        this.upcomingLiveSessions = upcomingLiveSessions;
+        this.suspendedUsers = suspendedUsers;
+        this.approvedUsers = approvedUsers;
     }
 
     public long getTotalStudents() { return totalStudents; }
@@ -49,6 +59,16 @@ public class PlatformMetricsDto {
     public void setTotalQuestions(long totalQuestions) { this.totalQuestions = totalQuestions; }
     public long getResolvedQuestions() { return resolvedQuestions; }
     public void setResolvedQuestions(long resolvedQuestions) { this.resolvedQuestions = resolvedQuestions; }
+    public long getTotalAssignments() { return totalAssignments; }
+    public void setTotalAssignments(long totalAssignments) { this.totalAssignments = totalAssignments; }
+    public long getTotalExaminations() { return totalExaminations; }
+    public void setTotalExaminations(long totalExaminations) { this.totalExaminations = totalExaminations; }
+    public long getUpcomingLiveSessions() { return upcomingLiveSessions; }
+    public void setUpcomingLiveSessions(long upcomingLiveSessions) { this.upcomingLiveSessions = upcomingLiveSessions; }
+    public long getSuspendedUsers() { return suspendedUsers; }
+    public void setSuspendedUsers(long suspendedUsers) { this.suspendedUsers = suspendedUsers; }
+    public long getApprovedUsers() { return approvedUsers; }
+    public void setApprovedUsers(long approvedUsers) { this.approvedUsers = approvedUsers; }
 
     public static Builder builder() {
         return new Builder();
@@ -65,6 +85,11 @@ public class PlatformMetricsDto {
         private long totalLectures;
         private long totalQuestions;
         private long resolvedQuestions;
+        private long totalAssignments;
+        private long totalExaminations;
+        private long upcomingLiveSessions;
+        private long suspendedUsers;
+        private long approvedUsers;
 
         public Builder totalStudents(long totalStudents) {
             this.totalStudents = totalStudents;
@@ -106,9 +131,29 @@ public class PlatformMetricsDto {
             this.resolvedQuestions = resolvedQuestions;
             return this;
         }
+        public Builder totalAssignments(long totalAssignments) {
+            this.totalAssignments = totalAssignments;
+            return this;
+        }
+        public Builder totalExaminations(long totalExaminations) {
+            this.totalExaminations = totalExaminations;
+            return this;
+        }
+        public Builder upcomingLiveSessions(long upcomingLiveSessions) {
+            this.upcomingLiveSessions = upcomingLiveSessions;
+            return this;
+        }
+        public Builder suspendedUsers(long suspendedUsers) {
+            this.suspendedUsers = suspendedUsers;
+            return this;
+        }
+        public Builder approvedUsers(long approvedUsers) {
+            this.approvedUsers = approvedUsers;
+            return this;
+        }
 
         public PlatformMetricsDto build() {
-            return new PlatformMetricsDto(totalStudents, totalFaculty, pendingStudentApprovals, pendingFacultyApprovals, totalCourses, totalSubjects, totalMaterials, totalLectures, totalQuestions, resolvedQuestions);
+            return new PlatformMetricsDto(totalStudents, totalFaculty, pendingStudentApprovals, pendingFacultyApprovals, totalCourses, totalSubjects, totalMaterials, totalLectures, totalQuestions, resolvedQuestions, totalAssignments, totalExaminations, upcomingLiveSessions, suspendedUsers, approvedUsers);
         }
     }
 }

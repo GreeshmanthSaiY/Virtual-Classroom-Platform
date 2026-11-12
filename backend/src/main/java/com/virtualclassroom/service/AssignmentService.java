@@ -36,6 +36,7 @@ public class AssignmentService {
     private final FacultySubjectAssignmentRepository facultyAssignmentRepository;
     private final StudentSubjectEnrollmentRepository enrollmentRepository;
     private final AuditLogService auditLogService;
+    private final NotificationService notificationService;
 
     public AssignmentService(
             AssignmentRepository assignmentRepository,
@@ -45,12 +46,27 @@ public class AssignmentService {
             StudentSubjectEnrollmentRepository enrollmentRepository,
             AuditLogService auditLogService
     ) {
+        this(assignmentRepository, submissionRepository, subjectRepository, facultyAssignmentRepository,
+                enrollmentRepository, auditLogService, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public AssignmentService(
+            AssignmentRepository assignmentRepository,
+            AssignmentSubmissionRepository submissionRepository,
+            SubjectRepository subjectRepository,
+            FacultySubjectAssignmentRepository facultyAssignmentRepository,
+            StudentSubjectEnrollmentRepository enrollmentRepository,
+            AuditLogService auditLogService,
+            @org.springframework.beans.factory.annotation.Autowired(required = false) NotificationService notificationService
+    ) {
         this.assignmentRepository = assignmentRepository;
         this.submissionRepository = submissionRepository;
         this.subjectRepository = subjectRepository;
         this.facultyAssignmentRepository = facultyAssignmentRepository;
         this.enrollmentRepository = enrollmentRepository;
         this.auditLogService = auditLogService;
+        this.notificationService = notificationService;
     }
 
     public AssignmentDto createAssignment(CreateAssignmentRequest request, User facultyUser, String ipAddress) {
@@ -77,6 +93,18 @@ public class AssignmentService {
         Assignment saved = assignmentRepository.save(assignment);
         auditLogService.logAction(facultyUser, "CREATE_ASSIGNMENT", "Assignment", saved.getId().toString(),
                 "Title: " + saved.getTitle(), ipAddress);
+
+        if (notificationService != null && enrollmentRepository != null) {
+            List<com.virtualclassroom.model.StudentSubjectEnrollment> enrollments = enrollmentRepository.findBySubjectId(subject.getId());
+            for (com.virtualclassroom.model.StudentSubjectEnrollment enrollment : enrollments) {
+                notificationService.createNotification(
+                        enrollment.getStudent(),
+                        "New Assignment: " + saved.getTitle(),
+                        "A new assignment has been posted for " + subject.getTitle() + ". Due: " + saved.getDueDate(),
+                        "ASSIGNMENT_CREATED"
+                );
+            }
+        }
 
         return AssignmentDto.fromEntity(saved);
     }
@@ -165,6 +193,15 @@ public class AssignmentService {
         AssignmentSubmission saved = submissionRepository.save(submission);
         auditLogService.logAction(facultyUser, "GRADE_ASSIGNMENT", "AssignmentSubmission", saved.getId().toString(),
                 "Points: " + request.getGradePoints(), ipAddress);
+
+        if (notificationService != null && saved.getStudent() != null) {
+            notificationService.createNotification(
+                    saved.getStudent(),
+                    "Assignment Graded: " + saved.getAssignment().getTitle(),
+                    "Your submission has been evaluated. Score: " + saved.getGradePoints() + "/" + saved.getAssignment().getMaxPoints(),
+                    "ASSIGNMENT_GRADED"
+            );
+        }
 
         return AssignmentSubmissionDto.fromEntity(saved);
     }

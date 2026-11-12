@@ -12,11 +12,14 @@ public class AnswerDto {
     private String authorRole;
     private String body;
     private Boolean isAccepted;
+    private Boolean isEndorsed;
+    private Long endorsedById;
+    private String endorsedByName;
     private Instant createdAt;
 
     public AnswerDto() {}
 
-    public AnswerDto(Long id, Long questionId, Long authorId, String authorName, String authorRole, String body, Boolean isAccepted, Instant createdAt) {
+    public AnswerDto(Long id, Long questionId, Long authorId, String authorName, String authorRole, String body, Boolean isAccepted, Boolean isEndorsed, Long endorsedById, String endorsedByName, Instant createdAt) {
         this.id = id;
         this.questionId = questionId;
         this.authorId = authorId;
@@ -24,6 +27,9 @@ public class AnswerDto {
         this.authorRole = authorRole;
         this.body = body;
         this.isAccepted = isAccepted;
+        this.isEndorsed = isEndorsed;
+        this.endorsedById = endorsedById;
+        this.endorsedByName = endorsedByName;
         this.createdAt = createdAt;
     }
 
@@ -41,6 +47,12 @@ public class AnswerDto {
     public void setBody(String body) { this.body = body; }
     public Boolean isAccepted() { return isAccepted; }
     public void setAccepted(Boolean isAccepted) { this.isAccepted = isAccepted; }
+    public Boolean isEndorsed() { return isEndorsed; }
+    public void setEndorsed(Boolean isEndorsed) { this.isEndorsed = isEndorsed; }
+    public Long getEndorsedById() { return endorsedById; }
+    public void setEndorsedById(Long endorsedById) { this.endorsedById = endorsedById; }
+    public String getEndorsedByName() { return endorsedByName; }
+    public void setEndorsedByName(String endorsedByName) { this.endorsedByName = endorsedByName; }
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
 
@@ -56,6 +68,9 @@ public class AnswerDto {
         private String authorRole;
         private String body;
         private Boolean isAccepted;
+        private Boolean isEndorsed;
+        private Long endorsedById;
+        private String endorsedByName;
         private Instant createdAt;
 
         public Builder id(Long id) {
@@ -86,13 +101,25 @@ public class AnswerDto {
             this.isAccepted = isAccepted;
             return this;
         }
+        public Builder isEndorsed(Boolean isEndorsed) {
+            this.isEndorsed = isEndorsed;
+            return this;
+        }
+        public Builder endorsedById(Long endorsedById) {
+            this.endorsedById = endorsedById;
+            return this;
+        }
+        public Builder endorsedByName(String endorsedByName) {
+            this.endorsedByName = endorsedByName;
+            return this;
+        }
         public Builder createdAt(Instant createdAt) {
             this.createdAt = createdAt;
             return this;
         }
 
         public AnswerDto build() {
-            return new AnswerDto(id, questionId, authorId, authorName, authorRole, body, isAccepted, createdAt);
+            return new AnswerDto(id, questionId, authorId, authorName, authorRole, body, isAccepted, isEndorsed, endorsedById, endorsedByName, createdAt);
         }
     }
 }

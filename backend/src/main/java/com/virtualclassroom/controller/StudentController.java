@@ -24,6 +24,12 @@ public class StudentController {
         this.studentService = studentService;
     }
 
+    @GetMapping("/dashboard")
+    @Operation(summary = "Get aggregated student academic dashboard including courses, sessions, assignments and grades")
+    public ResponseEntity<ApiResponse<StudentDashboardDto>> getStudentDashboard(@AuthenticationPrincipal UserPrincipal principal) {
+        StudentDashboardDto dashboard = studentService.getStudentDashboard(principal.getId());
+        return ResponseEntity.ok(ApiResponse.success(dashboard, "Student dashboard retrieved successfully"));
+    }
 
     @GetMapping("/course")
     @Operation(summary = "Get student's enrolled degree and course details")

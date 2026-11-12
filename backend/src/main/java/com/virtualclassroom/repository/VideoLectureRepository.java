@@ -15,5 +15,6 @@ public interface VideoLectureRepository extends JpaRepository<VideoLecture, Long
     List<VideoLecture> findByFacultyId(Long facultyId);
     List<VideoLecture> findByFacultyIdAndSubjectId(Long facultyId, Integer subjectId);
     List<VideoLecture> findBySubjectIdIn(List<Integer> subjectIds);
+    long countByFacultyId(Long facultyId);
 }
 

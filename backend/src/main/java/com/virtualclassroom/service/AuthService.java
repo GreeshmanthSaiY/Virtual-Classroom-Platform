@@ -39,6 +39,7 @@ public class AuthService {
     private final JwtTokenProvider tokenProvider;
     private final AuditLogService auditLogService;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final PasswordResetTokenRepository passwordResetTokenRepository;
 
     public AuthService(
             AuthenticationManager authenticationManager,
@@ -54,7 +55,25 @@ public class AuthService {
     ) {
         this(authenticationManager, userRepository, studentProfileRepository, facultyProfileRepository,
                 courseRepository, subjectRepository, assignmentRepository, passwordEncoder, tokenProvider,
-                auditLogService, null);
+                auditLogService, null, null);
+    }
+
+    public AuthService(
+            AuthenticationManager authenticationManager,
+            UserRepository userRepository,
+            StudentProfileRepository studentProfileRepository,
+            FacultyProfileRepository facultyProfileRepository,
+            CourseRepository courseRepository,
+            SubjectRepository subjectRepository,
+            FacultySubjectAssignmentRepository assignmentRepository,
+            PasswordEncoder passwordEncoder,
+            JwtTokenProvider tokenProvider,
+            AuditLogService auditLogService,
+            RefreshTokenRepository refreshTokenRepository
+    ) {
+        this(authenticationManager, userRepository, studentProfileRepository, facultyProfileRepository,
+                courseRepository, subjectRepository, assignmentRepository, passwordEncoder, tokenProvider,
+                auditLogService, refreshTokenRepository, null);
     }
 
     @Autowired
@@ -69,7 +88,8 @@ public class AuthService {
             PasswordEncoder passwordEncoder,
             JwtTokenProvider tokenProvider,
             AuditLogService auditLogService,
-            @Autowired(required = false) RefreshTokenRepository refreshTokenRepository
+            @Autowired(required = false) RefreshTokenRepository refreshTokenRepository,
+            @Autowired(required = false) PasswordResetTokenRepository passwordResetTokenRepository
     ) {
         this.authenticationManager = authenticationManager;
         this.userRepository = userRepository;
@@ -82,6 +102,7 @@ public class AuthService {
         this.tokenProvider = tokenProvider;
         this.auditLogService = auditLogService;
         this.refreshTokenRepository = refreshTokenRepository;
+        this.passwordResetTokenRepository = passwordResetTokenRepository;
     }
 
 
@@ -201,6 +222,115 @@ public class AuthService {
                 refreshTokenRepository.save(token);
             });
         }
+    }
+
+    @Transactional
+    public String forgotPassword(String email, String ipAddress) {
+        if (email == null || email.isBlank()) {
+            throw new IllegalArgumentException("Email address is required");
+        }
+        String normalizedEmail = email.trim().toLowerCase();
+        userRepository.findByEmail(normalizedEmail).ifPresent(user -> {
+            if (user.getStatus() == UserStatus.APPROVED && passwordResetTokenRepository != null) {
+                // Invalidate existing pending tokens
+                passwordResetTokenRepository.invalidateAllActiveByUserId(user.getId());
+
+                String rawToken = generateSecureToken();
+                String hashedToken = hashToken(rawToken);
+                PasswordResetToken resetToken = PasswordResetToken.builder()
+                        .user(user)
+                        .tokenHash(hashedToken)
+                        .expiresAt(Instant.now().plus(15, ChronoUnit.MINUTES))
+                        .used(false)
+                        .build();
+                passwordResetTokenRepository.save(resetToken);
+
+                auditLogService.logAction(user, "PASSWORD_RESET_REQUESTED", "users",
+                        user.getId().toString(), "Password reset token requested", ipAddress);
+            }
+        });
+
+        return "If an account exists with this email address, password reset instructions have been sent.";
+    }
+
+    @Transactional
+    public void resetPassword(String rawToken, String newPassword, String ipAddress) {
+        if (passwordResetTokenRepository == null) {
+            throw new IllegalStateException("Password reset repository is not configured");
+        }
+        if (rawToken == null || rawToken.isBlank()) {
+            throw new BadCredentialsException("Password reset token is required");
+        }
+        if (newPassword == null || newPassword.length() < 8) {
+            throw new IllegalArgumentException("Password must be at least 8 characters long");
+        }
+
+        String hashedToken = hashToken(rawToken);
+        PasswordResetToken resetToken = passwordResetTokenRepository.findByTokenHash(hashedToken)
+                .orElseThrow(() -> new BadCredentialsException("Invalid or expired password reset token"));
+
+        if (resetToken.isUsed()) {
+            throw new BadCredentialsException("This password reset token has already been used");
+        }
+
+        if (resetToken.getExpiresAt().isBefore(Instant.now())) {
+            throw new BadCredentialsException("This password reset token has expired");
+        }
+
+        User user = resetToken.getUser();
+        if (user.getStatus() != UserStatus.APPROVED) {
+            throw new IllegalStateException("Account is not active (status: " + user.getStatus() + ")");
+        }
+
+        // Update password
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+
+        // Mark token as used
+        resetToken.setUsed(true);
+        passwordResetTokenRepository.save(resetToken);
+
+        // Invalidate all active user sessions for security
+        if (refreshTokenRepository != null) {
+            refreshTokenRepository.revokeAllActiveByUserId(user.getId());
+        }
+
+        auditLogService.logAction(user, "PASSWORD_RESET_COMPLETED", "users",
+                user.getId().toString(), "Password successfully reset via token", ipAddress);
+    }
+
+    @Transactional
+    public void changePassword(Long userId, String oldPassword, String newPassword, String ipAddress) {
+        if (userId == null) {
+            throw new IllegalArgumentException("User identifier is required");
+        }
+        if (oldPassword == null || oldPassword.isBlank()) {
+            throw new BadCredentialsException("Current password is required");
+        }
+        if (newPassword == null || newPassword.length() < 8) {
+            throw new IllegalArgumentException("New password must be at least 8 characters long");
+        }
+        if (oldPassword.equals(newPassword)) {
+            throw new IllegalArgumentException("New password must be different from current password");
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        if (!passwordEncoder.matches(oldPassword, user.getPasswordHash())) {
+            throw new BadCredentialsException("Current password does not match");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+
+        // Revoke all refresh tokens to terminate all active sessions across other devices
+        if (refreshTokenRepository != null) {
+            refreshTokenRepository.revokeAllActiveByUserId(user.getId());
+        }
+
+        auditLogService.logAction(user, "PASSWORD_CHANGED", "users",
+                user.getId().toString(), "Password changed successfully", ipAddress);
     }
 
     public String generateSecureToken() {

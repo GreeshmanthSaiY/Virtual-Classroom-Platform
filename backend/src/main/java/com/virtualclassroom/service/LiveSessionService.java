@@ -29,6 +29,7 @@ public class LiveSessionService {
     private final FacultySubjectAssignmentRepository facultyAssignmentRepository;
     private final StudentSubjectEnrollmentRepository enrollmentRepository;
     private final AuditLogService auditLogService;
+    private final NotificationService notificationService;
 
     public LiveSessionService(
             LiveSessionRepository liveSessionRepository,
@@ -37,11 +38,24 @@ public class LiveSessionService {
             StudentSubjectEnrollmentRepository enrollmentRepository,
             AuditLogService auditLogService
     ) {
+        this(liveSessionRepository, subjectRepository, facultyAssignmentRepository, enrollmentRepository, auditLogService, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public LiveSessionService(
+            LiveSessionRepository liveSessionRepository,
+            SubjectRepository subjectRepository,
+            FacultySubjectAssignmentRepository facultyAssignmentRepository,
+            StudentSubjectEnrollmentRepository enrollmentRepository,
+            AuditLogService auditLogService,
+            @org.springframework.beans.factory.annotation.Autowired(required = false) NotificationService notificationService
+    ) {
         this.liveSessionRepository = liveSessionRepository;
         this.subjectRepository = subjectRepository;
         this.facultyAssignmentRepository = facultyAssignmentRepository;
         this.enrollmentRepository = enrollmentRepository;
         this.auditLogService = auditLogService;
+        this.notificationService = notificationService;
     }
 
     public LiveSessionDto scheduleLiveSession(CreateLiveSessionRequest request, User hostUser, String ipAddress) {
@@ -81,6 +95,18 @@ public class LiveSessionService {
         LiveSession saved = liveSessionRepository.save(session);
         auditLogService.logAction(hostUser, "SCHEDULE_LIVE_SESSION", "LiveSession", saved.getId().toString(),
                 "Title: " + saved.getTitle(), ipAddress);
+
+        if (notificationService != null && enrollmentRepository != null) {
+            List<com.virtualclassroom.model.StudentSubjectEnrollment> enrollments = enrollmentRepository.findBySubjectId(subject.getId());
+            for (com.virtualclassroom.model.StudentSubjectEnrollment enrollment : enrollments) {
+                notificationService.createNotification(
+                        enrollment.getStudent(),
+                        "Live Classroom Session Scheduled",
+                        "Live session for " + subject.getTitle() + " has been scheduled for " + saved.getScheduledStart(),
+                        "SESSION_SCHEDULED"
+                );
+            }
+        }
 
         return LiveSessionDto.fromEntity(saved);
     }

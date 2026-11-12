@@ -1,19 +1,9 @@
 package com.virtualclassroom.service;
 
-import com.virtualclassroom.dto.CourseDto;
-import com.virtualclassroom.dto.StudyMaterialDto;
-import com.virtualclassroom.dto.SubjectDto;
-import com.virtualclassroom.dto.VideoLectureDto;
-import com.virtualclassroom.model.Course;
-import com.virtualclassroom.model.Role;
-import com.virtualclassroom.model.StudentProfile;
-import com.virtualclassroom.model.Subject;
-import com.virtualclassroom.model.StudyMaterial;
-import com.virtualclassroom.model.VideoLecture;
-import com.virtualclassroom.repository.StudentProfileRepository;
-import com.virtualclassroom.repository.StudyMaterialRepository;
-import com.virtualclassroom.repository.SubjectRepository;
-import com.virtualclassroom.repository.VideoLectureRepository;
+import com.virtualclassroom.dto.*;
+import com.virtualclassroom.model.*;
+import com.virtualclassroom.repository.*;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,13 +20,106 @@ public class StudentService {
     private final StudyMaterialRepository studyMaterialRepository;
     private final VideoLectureRepository videoLectureRepository;
     private final CourseService courseService;
+    private final LiveSessionRepository liveSessionRepository;
+    private final AssignmentRepository assignmentRepository;
+    private final AssignmentSubmissionRepository assignmentSubmissionRepository;
+    private final ExaminationResultRepository examinationResultRepository;
+    private final NotificationRepository notificationRepository;
 
-    public StudentService(StudentProfileRepository studentProfileRepository, SubjectRepository subjectRepository, StudyMaterialRepository studyMaterialRepository, VideoLectureRepository videoLectureRepository, CourseService courseService) {
+    public StudentService(
+            StudentProfileRepository studentProfileRepository,
+            SubjectRepository subjectRepository,
+            StudyMaterialRepository studyMaterialRepository,
+            VideoLectureRepository videoLectureRepository,
+            CourseService courseService
+    ) {
+        this(studentProfileRepository, subjectRepository, studyMaterialRepository, videoLectureRepository,
+                courseService, null, null, null, null, null);
+    }
+
+    @Autowired
+    public StudentService(
+            StudentProfileRepository studentProfileRepository,
+            SubjectRepository subjectRepository,
+            StudyMaterialRepository studyMaterialRepository,
+            VideoLectureRepository videoLectureRepository,
+            CourseService courseService,
+            @Autowired(required = false) LiveSessionRepository liveSessionRepository,
+            @Autowired(required = false) AssignmentRepository assignmentRepository,
+            @Autowired(required = false) AssignmentSubmissionRepository assignmentSubmissionRepository,
+            @Autowired(required = false) ExaminationResultRepository examinationResultRepository,
+            @Autowired(required = false) NotificationRepository notificationRepository
+    ) {
         this.studentProfileRepository = studentProfileRepository;
         this.subjectRepository = subjectRepository;
         this.studyMaterialRepository = studyMaterialRepository;
         this.videoLectureRepository = videoLectureRepository;
         this.courseService = courseService;
+        this.liveSessionRepository = liveSessionRepository;
+        this.assignmentRepository = assignmentRepository;
+        this.assignmentSubmissionRepository = assignmentSubmissionRepository;
+        this.examinationResultRepository = examinationResultRepository;
+        this.notificationRepository = notificationRepository;
+    }
+
+    @Transactional(readOnly = true)
+    public StudentDashboardDto getStudentDashboard(Long studentUserId) {
+        StudentProfile profile = studentProfileRepository.findById(studentUserId)
+                .orElseThrow(() -> new IllegalArgumentException("Student profile not found"));
+
+        CourseDto course = profile.getCourse() != null ? courseService.toCourseDto(profile.getCourse()) : null;
+
+        List<Subject> subjects = profile.getCourse() != null
+                ? subjectRepository.findByCourseIdAndYearLevel(profile.getCourse().getId(), profile.getCurrentYear())
+                : Collections.emptyList();
+        List<SubjectDto> enrolledSubjects = subjects.stream().map(courseService::toSubjectDto).collect(Collectors.toList());
+        List<Integer> subjectIds = subjects.stream().map(Subject::getId).collect(Collectors.toList());
+
+        List<LiveSessionDto> upcomingSessions = Collections.emptyList();
+        if (liveSessionRepository != null && !subjectIds.isEmpty()) {
+            upcomingSessions = liveSessionRepository.findBySubjectIdInAndStatusOrderByScheduledStartAsc(
+                    subjectIds, LiveSessionStatus.SCHEDULED).stream()
+                    .map(LiveSessionDto::fromEntity)
+                    .limit(5)
+                    .collect(Collectors.toList());
+        }
+
+        List<AssignmentDto> pendingAssignments = Collections.emptyList();
+        if (assignmentRepository != null && !subjectIds.isEmpty()) {
+            pendingAssignments = assignmentRepository.findBySubjectIdInOrderByDueDateAsc(subjectIds).stream()
+                    .filter(a -> assignmentSubmissionRepository == null || !assignmentSubmissionRepository.existsByAssignmentIdAndStudentId(a.getId(), studentUserId))
+                    .map(AssignmentDto::fromEntity)
+                    .limit(5)
+                    .collect(Collectors.toList());
+        }
+
+        List<AssignmentSubmissionDto> recentSubmissions = Collections.emptyList();
+        if (assignmentSubmissionRepository != null) {
+            recentSubmissions = assignmentSubmissionRepository.findByStudentIdOrderBySubmittedAtDesc(studentUserId).stream()
+                    .map(AssignmentSubmissionDto::fromEntity)
+                    .limit(5)
+                    .collect(Collectors.toList());
+        }
+
+        List<ExaminationResultDto> recentExamResults = Collections.emptyList();
+        if (examinationResultRepository != null) {
+            recentExamResults = examinationResultRepository.findByStudentIdOrderByGradedAtDesc(studentUserId).stream()
+                    .map(ExaminationResultDto::fromEntity)
+                    .limit(5)
+                    .collect(Collectors.toList());
+        }
+
+        long unreadCount = notificationRepository != null ? notificationRepository.countByUserIdAndIsReadFalse(studentUserId) : 0;
+
+        return StudentDashboardDto.builder()
+                .course(course)
+                .enrolledSubjects(enrolledSubjects)
+                .upcomingLiveSessions(upcomingSessions)
+                .pendingAssignments(pendingAssignments)
+                .recentSubmissions(recentSubmissions)
+                .recentExamResults(recentExamResults)
+                .unreadNotificationCount(unreadCount)
+                .build();
     }
 
 

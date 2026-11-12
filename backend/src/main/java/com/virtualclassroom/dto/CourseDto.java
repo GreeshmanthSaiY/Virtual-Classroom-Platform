@@ -10,16 +10,18 @@ public class CourseDto {
     private String degreeCode;
     private String code;
     private String name;
+    private boolean archived;
     private List<SubjectDto> subjects;
 
     public CourseDto() {}
 
-    public CourseDto(Integer id, Integer degreeId, String degreeCode, String code, String name, List<SubjectDto> subjects) {
+    public CourseDto(Integer id, Integer degreeId, String degreeCode, String code, String name, boolean archived, List<SubjectDto> subjects) {
         this.id = id;
         this.degreeId = degreeId;
         this.degreeCode = degreeCode;
         this.code = code;
         this.name = name;
+        this.archived = archived;
         this.subjects = subjects;
     }
 
@@ -33,6 +35,8 @@ public class CourseDto {
     public void setCode(String code) { this.code = code; }
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
+    public boolean isArchived() { return archived; }
+    public void setArchived(boolean archived) { this.archived = archived; }
     public List<SubjectDto> getSubjects() { return subjects; }
     public void setSubjects(List<SubjectDto> subjects) { this.subjects = subjects; }
 
@@ -46,6 +50,7 @@ public class CourseDto {
         private String degreeCode;
         private String code;
         private String name;
+        private boolean archived;
         private List<SubjectDto> subjects;
 
         public Builder id(Integer id) {
@@ -68,13 +73,17 @@ public class CourseDto {
             this.name = name;
             return this;
         }
+        public Builder archived(boolean archived) {
+            this.archived = archived;
+            return this;
+        }
         public Builder subjects(List<SubjectDto> subjects) {
             this.subjects = subjects;
             return this;
         }
 
         public CourseDto build() {
-            return new CourseDto(id, degreeId, degreeCode, code, name, subjects);
+            return new CourseDto(id, degreeId, degreeCode, code, name, archived, subjects);
         }
     }
 }

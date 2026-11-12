@@ -70,6 +70,56 @@ public class AdminController {
         return ResponseEntity.ok(ApiResponse.success(users, "Users list retrieved"));
     }
 
+    @GetMapping("/users/search")
+    @Operation(summary = "Search users by keyword, role, and account status with pagination")
+    public ResponseEntity<ApiResponse<Page<UserDto>>> searchUsers(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) Role role,
+            @RequestParam(required = false) com.virtualclassroom.model.UserStatus status,
+            @PageableDefault(size = 20) Pageable pageable
+    ) {
+        Page<UserDto> users = adminService.searchUsers(q, role, status, pageable);
+        return ResponseEntity.ok(ApiResponse.success(users, "User search completed"));
+    }
+
+    @PostMapping("/users/{userId}/suspend")
+    @Operation(summary = "Suspend user account access and terminate active sessions")
+    public ResponseEntity<ApiResponse<Void>> suspendUser(
+            @PathVariable Long userId,
+            @Valid @RequestBody SuspendUserRequest request,
+            @AuthenticationPrincipal UserPrincipal principal,
+            HttpServletRequest servletRequest
+    ) {
+        User admin = userRepository.getReferenceById(principal.getId());
+        adminService.suspendUser(userId, request.getReason(), admin, servletRequest.getRemoteAddr());
+        return ResponseEntity.ok(ApiResponse.success(null, "User suspended successfully"));
+    }
+
+    @PostMapping("/users/{userId}/reactivate")
+    @Operation(summary = "Reactivate a suspended user account")
+    public ResponseEntity<ApiResponse<Void>> reactivateUser(
+            @PathVariable Long userId,
+            @AuthenticationPrincipal UserPrincipal principal,
+            HttpServletRequest servletRequest
+    ) {
+        User admin = userRepository.getReferenceById(principal.getId());
+        adminService.reactivateUser(userId, admin, servletRequest.getRemoteAddr());
+        return ResponseEntity.ok(ApiResponse.success(null, "User reactivated successfully"));
+    }
+
+    @PostMapping("/subjects/{subjectId}/assign-faculty")
+    @Operation(summary = "Assign a faculty member as instructor to a subject")
+    public ResponseEntity<ApiResponse<Void>> assignFacultyToSubject(
+            @PathVariable Integer subjectId,
+            @Valid @RequestBody AssignFacultyRequest request,
+            @AuthenticationPrincipal UserPrincipal principal,
+            HttpServletRequest servletRequest
+    ) {
+        User admin = userRepository.getReferenceById(principal.getId());
+        adminService.assignFacultyToSubject(subjectId, request.getFacultyId(), request.getAcademicTerm(), admin, servletRequest.getRemoteAddr());
+        return ResponseEntity.ok(ApiResponse.success(null, "Faculty assigned to subject successfully"));
+    }
+
     @PostMapping({"/approvals", "/approve"})
     @Operation(summary = "Approve user registration requests")
     public ResponseEntity<ApiResponse<Void>> approveUsers(

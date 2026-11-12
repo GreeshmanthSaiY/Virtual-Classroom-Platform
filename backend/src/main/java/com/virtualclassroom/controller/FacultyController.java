@@ -30,6 +30,22 @@ public class FacultyController {
         this.userRepository = userRepository;
     }
 
+    @GetMapping("/dashboard")
+    @Operation(summary = "Get aggregated faculty academic dashboard metrics, active sessions and pending submissions")
+    public ResponseEntity<ApiResponse<FacultyDashboardDto>> getFacultyDashboard(@AuthenticationPrincipal UserPrincipal principal) {
+        FacultyDashboardDto dashboard = facultyService.getFacultyDashboard(principal.getId());
+        return ResponseEntity.ok(ApiResponse.success(dashboard, "Faculty dashboard retrieved successfully"));
+    }
+
+    @GetMapping("/subjects/{subjectId}/students")
+    @Operation(summary = "Inspect student roster enrolled in a subject taught by this faculty member")
+    public ResponseEntity<ApiResponse<List<UserDto>>> getSubjectStudentRoster(
+            @PathVariable Integer subjectId,
+            @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        List<UserDto> roster = facultyService.getEnrolledStudentsForSubject(subjectId, principal.getId());
+        return ResponseEntity.ok(ApiResponse.success(roster, "Student roster retrieved successfully"));
+    }
 
     @GetMapping("/subjects")
     @Operation(summary = "Get list of subjects assigned to this faculty member")

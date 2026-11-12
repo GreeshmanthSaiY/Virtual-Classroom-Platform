@@ -3,10 +3,12 @@ package com.virtualclassroom.service;
 import com.virtualclassroom.dto.*;
 import com.virtualclassroom.model.*;
 import com.virtualclassroom.repository.*;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -19,14 +21,110 @@ public class FacultyService {
     private final VideoLectureRepository videoLectureRepository;
     private final CourseService courseService;
     private final AuditLogService auditLogService;
+    private final LiveSessionRepository liveSessionRepository;
+    private final AssignmentSubmissionRepository assignmentSubmissionRepository;
+    private final QuestionRepository questionRepository;
+    private final StudentSubjectEnrollmentRepository studentSubjectEnrollmentRepository;
 
-    public FacultyService(FacultySubjectAssignmentRepository assignmentRepository, SubjectRepository subjectRepository, StudyMaterialRepository studyMaterialRepository, VideoLectureRepository videoLectureRepository, CourseService courseService, AuditLogService auditLogService) {
+    public FacultyService(
+            FacultySubjectAssignmentRepository assignmentRepository,
+            SubjectRepository subjectRepository,
+            StudyMaterialRepository studyMaterialRepository,
+            VideoLectureRepository videoLectureRepository,
+            CourseService courseService,
+            AuditLogService auditLogService
+    ) {
+        this(assignmentRepository, subjectRepository, studyMaterialRepository, videoLectureRepository,
+                courseService, auditLogService, null, null, null, null);
+    }
+
+    @Autowired
+    public FacultyService(
+            FacultySubjectAssignmentRepository assignmentRepository,
+            SubjectRepository subjectRepository,
+            StudyMaterialRepository studyMaterialRepository,
+            VideoLectureRepository videoLectureRepository,
+            CourseService courseService,
+            AuditLogService auditLogService,
+            @Autowired(required = false) LiveSessionRepository liveSessionRepository,
+            @Autowired(required = false) AssignmentSubmissionRepository assignmentSubmissionRepository,
+            @Autowired(required = false) QuestionRepository questionRepository,
+            @Autowired(required = false) StudentSubjectEnrollmentRepository studentSubjectEnrollmentRepository
+    ) {
         this.assignmentRepository = assignmentRepository;
         this.subjectRepository = subjectRepository;
         this.studyMaterialRepository = studyMaterialRepository;
         this.videoLectureRepository = videoLectureRepository;
         this.courseService = courseService;
         this.auditLogService = auditLogService;
+        this.liveSessionRepository = liveSessionRepository;
+        this.assignmentSubmissionRepository = assignmentSubmissionRepository;
+        this.questionRepository = questionRepository;
+        this.studentSubjectEnrollmentRepository = studentSubjectEnrollmentRepository;
+    }
+
+    @Transactional(readOnly = true)
+    public FacultyDashboardDto getFacultyDashboard(Long facultyUserId) {
+        List<SubjectDto> assignedSubjects = getAssignedSubjects(facultyUserId);
+        List<Integer> subjectIds = assignedSubjects.stream().map(SubjectDto::getId).collect(Collectors.toList());
+
+        long totalMaterials = studyMaterialRepository.countByUploaderId(facultyUserId);
+        long totalLectures = videoLectureRepository.countByFacultyId(facultyUserId);
+
+        List<LiveSessionDto> upcomingSessions = Collections.emptyList();
+        if (liveSessionRepository != null && !subjectIds.isEmpty()) {
+            upcomingSessions = liveSessionRepository.findBySubjectIdInAndStatusOrderByScheduledStartAsc(
+                    subjectIds, LiveSessionStatus.SCHEDULED).stream()
+                    .map(LiveSessionDto::fromEntity)
+                    .limit(5)
+                    .collect(Collectors.toList());
+        }
+
+        List<AssignmentSubmissionDto> pendingSubmissions = Collections.emptyList();
+        long pendingCount = 0;
+        if (assignmentSubmissionRepository != null) {
+            pendingSubmissions = assignmentSubmissionRepository.findPendingGradingByFacultyId(facultyUserId).stream()
+                    .map(AssignmentSubmissionDto::fromEntity)
+                    .limit(10)
+                    .collect(Collectors.toList());
+            pendingCount = assignmentSubmissionRepository.countPendingGradingByFacultyId(facultyUserId);
+        }
+
+        List<QuestionDto> recentQuestions = Collections.emptyList();
+        if (questionRepository != null && !subjectIds.isEmpty()) {
+            recentQuestions = subjectIds.stream()
+                    .flatMap(sId -> questionRepository.findBySubjectIdOrderByCreatedAtDesc(sId).stream())
+                    .limit(5)
+                    .map(this::toQuestionDto)
+                    .collect(Collectors.toList());
+        }
+
+        return FacultyDashboardDto.builder()
+                .assignedSubjects(assignedSubjects)
+                .totalMaterialsUploaded(totalMaterials)
+                .totalLecturesPublished(totalLectures)
+                .upcomingLiveSessions(upcomingSessions)
+                .pendingSubmissionsToGrade(pendingSubmissions)
+                .pendingSubmissionsCount(pendingCount)
+                .recentForumQuestions(recentQuestions)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public List<UserDto> getEnrolledStudentsForSubject(Integer subjectId, Long facultyUserId) {
+        if (!assignmentRepository.existsByFacultyIdAndSubjectId(facultyUserId, subjectId)) {
+            throw new AccessDeniedException("Access denied: You are not assigned to instruct this subject");
+        }
+
+        if (studentSubjectEnrollmentRepository == null) {
+            return Collections.emptyList();
+        }
+
+        List<StudentSubjectEnrollment> enrollments = studentSubjectEnrollmentRepository.findBySubjectId(subjectId);
+        return enrollments.stream()
+                .map(StudentSubjectEnrollment::getStudent)
+                .map(this::toUserDto)
+                .collect(Collectors.toList());
     }
 
 
@@ -166,5 +264,38 @@ public class FacultyService {
         }
 
         videoLectureRepository.delete(lecture);
+    }
+
+    private UserDto toUserDto(User user) {
+        UserDto.UserDtoBuilder builder = UserDto.builder()
+                .id(user.getId())
+                .email(user.getEmail())
+                .fullName(user.getFullName())
+                .role(user.getRole().name())
+                .status(user.getStatus().name())
+                .createdAt(user.getCreatedAt());
+
+        if (user.getStudentProfile() != null) {
+            builder.rollNumber(user.getStudentProfile().getRollNumber())
+                    .courseName(user.getStudentProfile().getCourse() != null ? user.getStudentProfile().getCourse().getName() : null)
+                    .currentYear(user.getStudentProfile().getCurrentYear());
+        }
+        return builder.build();
+    }
+
+    private QuestionDto toQuestionDto(Question q) {
+        return QuestionDto.builder()
+                .id(q.getId())
+                .subjectId(q.getSubject().getId())
+                .subjectTitle(q.getSubject().getTitle())
+                .authorId(q.getAuthor().getId())
+                .authorName(q.getAuthor().getFullName())
+                .authorRole(q.getAuthor().getRole().name())
+                .title(q.getTitle())
+                .body(q.getBody())
+                .isResolved(q.getIsResolved())
+                .answersCount(q.getAnswers() != null ? q.getAnswers().size() : 0)
+                .createdAt(q.getCreatedAt())
+                .build();
     }
 }

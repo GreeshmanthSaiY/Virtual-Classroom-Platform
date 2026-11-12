@@ -36,6 +36,7 @@ public class ExaminationService {
     private final StudentSubjectEnrollmentRepository enrollmentRepository;
     private final UserRepository userRepository;
     private final AuditLogService auditLogService;
+    private final NotificationService notificationService;
 
     public ExaminationService(
             ExaminationRepository examinationRepository,
@@ -46,6 +47,21 @@ public class ExaminationService {
             UserRepository userRepository,
             AuditLogService auditLogService
     ) {
+        this(examinationRepository, resultRepository, subjectRepository, facultyAssignmentRepository,
+                enrollmentRepository, userRepository, auditLogService, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public ExaminationService(
+            ExaminationRepository examinationRepository,
+            ExaminationResultRepository resultRepository,
+            SubjectRepository subjectRepository,
+            FacultySubjectAssignmentRepository facultyAssignmentRepository,
+            StudentSubjectEnrollmentRepository enrollmentRepository,
+            UserRepository userRepository,
+            AuditLogService auditLogService,
+            @org.springframework.beans.factory.annotation.Autowired(required = false) NotificationService notificationService
+    ) {
         this.examinationRepository = examinationRepository;
         this.resultRepository = resultRepository;
         this.subjectRepository = subjectRepository;
@@ -53,6 +69,7 @@ public class ExaminationService {
         this.enrollmentRepository = enrollmentRepository;
         this.userRepository = userRepository;
         this.auditLogService = auditLogService;
+        this.notificationService = notificationService;
     }
 
     public ExaminationDto createExamination(CreateExaminationRequest request, User creatorUser, String ipAddress) {
@@ -135,6 +152,15 @@ public class ExaminationService {
         ExaminationResult saved = resultRepository.save(result);
         auditLogService.logAction(facultyUser, "RECORD_EXAM_GRADE", "ExaminationResult", saved.getId().toString(),
                 "Marks: " + request.getMarksObtained() + ", Grade: " + request.getGrade(), ipAddress);
+
+        if (notificationService != null && saved.getStudent() != null) {
+            notificationService.createNotification(
+                    saved.getStudent(),
+                    "Examination Result Released: " + saved.getExamination().getTitle(),
+                    "Your evaluation has been recorded. Marks: " + saved.getMarksObtained() + "/" + saved.getExamination().getTotalMarks() + " (Grade: " + saved.getGrade() + ")",
+                    "EXAM_RESULT_RELEASED"
+            );
+        }
 
         return ExaminationResultDto.fromEntity(saved);
     }

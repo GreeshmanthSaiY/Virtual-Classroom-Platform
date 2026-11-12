@@ -1,17 +1,11 @@
 package com.virtualclassroom.service;
 
-import com.virtualclassroom.dto.AnswerDto;
-import com.virtualclassroom.dto.CreateAnswerRequest;
-import com.virtualclassroom.dto.CreateQuestionRequest;
-import com.virtualclassroom.dto.QuestionDto;
-import com.virtualclassroom.model.Answer;
-import com.virtualclassroom.model.Question;
-import com.virtualclassroom.model.Role;
-import com.virtualclassroom.model.Subject;
-import com.virtualclassroom.model.User;
-import com.virtualclassroom.repository.AnswerRepository;
-import com.virtualclassroom.repository.QuestionRepository;
-import com.virtualclassroom.repository.SubjectRepository;
+import com.virtualclassroom.dto.*;
+import com.virtualclassroom.model.*;
+import com.virtualclassroom.repository.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,13 +21,33 @@ public class ForumService {
     private final SubjectRepository subjectRepository;
     private final NotificationService notificationService;
     private final AuditLogService auditLogService;
+    private final FacultySubjectAssignmentRepository facultyAssignmentRepository;
 
-    public ForumService(QuestionRepository questionRepository, AnswerRepository answerRepository, SubjectRepository subjectRepository, NotificationService notificationService, AuditLogService auditLogService) {
+    public ForumService(
+            QuestionRepository questionRepository,
+            AnswerRepository answerRepository,
+            SubjectRepository subjectRepository,
+            NotificationService notificationService,
+            AuditLogService auditLogService
+    ) {
+        this(questionRepository, answerRepository, subjectRepository, notificationService, auditLogService, null);
+    }
+
+    @Autowired
+    public ForumService(
+            QuestionRepository questionRepository,
+            AnswerRepository answerRepository,
+            SubjectRepository subjectRepository,
+            NotificationService notificationService,
+            AuditLogService auditLogService,
+            @Autowired(required = false) FacultySubjectAssignmentRepository facultyAssignmentRepository
+    ) {
         this.questionRepository = questionRepository;
         this.answerRepository = answerRepository;
         this.subjectRepository = subjectRepository;
         this.notificationService = notificationService;
         this.auditLogService = auditLogService;
+        this.facultyAssignmentRepository = facultyAssignmentRepository;
     }
 
 
@@ -140,6 +154,108 @@ public class ForumService {
         questionRepository.save(question);
     }
 
+    @Transactional
+    public QuestionDto updateQuestion(Long questionId, UpdateQuestionRequest request, User actor, String ipAddress) {
+        Question question = questionRepository.findById(questionId)
+                .orElseThrow(() -> new IllegalArgumentException("Question not found with ID: " + questionId));
+
+        if (!question.getAuthor().getId().equals(actor.getId()) && actor.getRole() != Role.ROLE_ADMIN) {
+            throw new AccessDeniedException("Only the original author or an administrator can edit this question");
+        }
+
+        question.setTitle(request.getTitle().trim());
+        question.setBody(request.getBody().trim());
+        Question saved = questionRepository.save(question);
+
+        auditLogService.logAction(actor, "UPDATE_FORUM_QUESTION", "questions", saved.getId().toString(),
+                "Updated question: " + saved.getTitle(), ipAddress);
+
+        return toSummaryDto(saved);
+    }
+
+    @Transactional
+    public void deleteQuestion(Long questionId, User actor, String ipAddress) {
+        Question question = questionRepository.findById(questionId)
+                .orElseThrow(() -> new IllegalArgumentException("Question not found with ID: " + questionId));
+
+        if (!question.getAuthor().getId().equals(actor.getId()) && actor.getRole() != Role.ROLE_ADMIN) {
+            throw new AccessDeniedException("Only the original author or an administrator can delete this question");
+        }
+
+        questionRepository.delete(question);
+        auditLogService.logAction(actor, "DELETE_FORUM_QUESTION", "questions", questionId.toString(),
+                "Deleted question: " + question.getTitle(), ipAddress);
+    }
+
+    @Transactional
+    public AnswerDto updateAnswer(Long answerId, UpdateAnswerRequest request, User actor, String ipAddress) {
+        Answer answer = answerRepository.findById(answerId)
+                .orElseThrow(() -> new IllegalArgumentException("Answer not found with ID: " + answerId));
+
+        if (!answer.getAuthor().getId().equals(actor.getId()) && actor.getRole() != Role.ROLE_ADMIN) {
+            throw new AccessDeniedException("Only the original author or an administrator can edit this answer");
+        }
+
+        answer.setBody(request.getBody().trim());
+        Answer saved = answerRepository.save(answer);
+
+        auditLogService.logAction(actor, "UPDATE_FORUM_ANSWER", "answers", saved.getId().toString(),
+                "Updated answer on question ID: " + answer.getQuestion().getId(), ipAddress);
+
+        return toAnswerDto(saved);
+    }
+
+    @Transactional
+    public void deleteAnswer(Long answerId, User actor, String ipAddress) {
+        Answer answer = answerRepository.findById(answerId)
+                .orElseThrow(() -> new IllegalArgumentException("Answer not found with ID: " + answerId));
+
+        if (!answer.getAuthor().getId().equals(actor.getId()) && actor.getRole() != Role.ROLE_ADMIN) {
+            throw new AccessDeniedException("Only the original author or an administrator can delete this answer");
+        }
+
+        answerRepository.delete(answer);
+        auditLogService.logAction(actor, "DELETE_FORUM_ANSWER", "answers", answerId.toString(),
+                "Deleted answer ID: " + answerId, ipAddress);
+    }
+
+    @Transactional
+    public AnswerDto endorseAnswer(Long answerId, User facultyUser, String ipAddress) {
+        Answer answer = answerRepository.findById(answerId)
+                .orElseThrow(() -> new IllegalArgumentException("Answer not found with ID: " + answerId));
+
+        if (facultyUser.getRole() != Role.ROLE_ADMIN) {
+            boolean assigned = facultyAssignmentRepository != null && facultyAssignmentRepository.existsByFacultyIdAndSubjectId(
+                    facultyUser.getId(), answer.getQuestion().getSubject().getId());
+            if (!assigned) {
+                throw new AccessDeniedException("Only the assigned faculty instructor for this subject or an administrator can endorse answers");
+            }
+        }
+
+        answer.setIsEndorsed(true);
+        answer.setEndorsedBy(facultyUser);
+        Answer saved = answerRepository.save(answer);
+
+        if (!answer.getAuthor().getId().equals(facultyUser.getId())) {
+            notificationService.createNotification(
+                    answer.getAuthor(),
+                    "Answer Endorsed by Faculty",
+                    facultyUser.getFullName() + " endorsed your answer to: \"" + answer.getQuestion().getTitle() + "\"",
+                    "ANSWER_ENDORSED"
+            );
+        }
+
+        auditLogService.logAction(facultyUser, "ENDORSE_FORUM_ANSWER", "answers", saved.getId().toString(),
+                "Endorsed answer by " + answer.getAuthor().getEmail(), ipAddress);
+
+        return toAnswerDto(saved);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<QuestionDto> searchQuestions(String query, Integer subjectId, Pageable pageable) {
+        return questionRepository.searchQuestions(query, subjectId, pageable).map(this::toSummaryDto);
+    }
+
     private QuestionDto toSummaryDto(Question q) {
         return QuestionDto.builder()
                 .id(q.getId())
@@ -157,7 +273,7 @@ public class ForumService {
     }
 
     private AnswerDto toAnswerDto(Answer a) {
-        return AnswerDto.builder()
+        AnswerDto.Builder builder = AnswerDto.builder()
                 .id(a.getId())
                 .questionId(a.getQuestion().getId())
                 .authorId(a.getAuthor().getId())
@@ -165,7 +281,14 @@ public class ForumService {
                 .authorRole(a.getAuthor().getRole().name())
                 .body(a.getBody())
                 .isAccepted(a.getIsAccepted())
-                .createdAt(a.getCreatedAt())
-                .build();
+                .isEndorsed(a.getIsEndorsed())
+                .createdAt(a.getCreatedAt());
+
+        if (a.getEndorsedBy() != null) {
+            builder.endorsedById(a.getEndorsedBy().getId())
+                    .endorsedByName(a.getEndorsedBy().getFullName());
+        }
+
+        return builder.build();
     }
 }

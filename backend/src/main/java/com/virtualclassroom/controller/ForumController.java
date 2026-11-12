@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -99,5 +100,79 @@ public class ForumController {
         User user = userRepository.getReferenceById(principal.getId());
         forumService.markAnswerAccepted(answerId, user);
         return ResponseEntity.ok(ApiResponse.success(null, "Answer accepted successfully"));
+    }
+
+    @PatchMapping("/answers/{answerId}/endorse")
+    @PreAuthorize("hasAnyAuthority('ROLE_FACULTY', 'ROLE_ADMIN')")
+    @Operation(summary = "Faculty instructor endorsement of a high-quality answer")
+    public ResponseEntity<ApiResponse<AnswerDto>> endorseAnswer(
+            @PathVariable Long answerId,
+            @AuthenticationPrincipal UserPrincipal principal,
+            HttpServletRequest servletRequest
+    ) {
+        User user = userRepository.getReferenceById(principal.getId());
+        AnswerDto answer = forumService.endorseAnswer(answerId, user, servletRequest.getRemoteAddr());
+        return ResponseEntity.ok(ApiResponse.success(answer, "Answer endorsed successfully"));
+    }
+
+    @PutMapping("/questions/{questionId}")
+    @Operation(summary = "Update an existing discussion question (Author or Admin)")
+    public ResponseEntity<ApiResponse<QuestionDto>> updateQuestion(
+            @PathVariable Long questionId,
+            @Valid @RequestBody UpdateQuestionRequest request,
+            @AuthenticationPrincipal UserPrincipal principal,
+            HttpServletRequest servletRequest
+    ) {
+        User user = userRepository.getReferenceById(principal.getId());
+        QuestionDto question = forumService.updateQuestion(questionId, request, user, servletRequest.getRemoteAddr());
+        return ResponseEntity.ok(ApiResponse.success(question, "Question updated successfully"));
+    }
+
+    @DeleteMapping("/questions/{questionId}")
+    @Operation(summary = "Delete an existing discussion question (Author or Admin)")
+    public ResponseEntity<ApiResponse<Void>> deleteQuestion(
+            @PathVariable Long questionId,
+            @AuthenticationPrincipal UserPrincipal principal,
+            HttpServletRequest servletRequest
+    ) {
+        User user = userRepository.getReferenceById(principal.getId());
+        forumService.deleteQuestion(questionId, user, servletRequest.getRemoteAddr());
+        return ResponseEntity.ok(ApiResponse.success(null, "Question deleted successfully"));
+    }
+
+    @PutMapping("/answers/{answerId}")
+    @Operation(summary = "Update an existing answer (Author or Admin)")
+    public ResponseEntity<ApiResponse<AnswerDto>> updateAnswer(
+            @PathVariable Long answerId,
+            @Valid @RequestBody UpdateAnswerRequest request,
+            @AuthenticationPrincipal UserPrincipal principal,
+            HttpServletRequest servletRequest
+    ) {
+        User user = userRepository.getReferenceById(principal.getId());
+        AnswerDto answer = forumService.updateAnswer(answerId, request, user, servletRequest.getRemoteAddr());
+        return ResponseEntity.ok(ApiResponse.success(answer, "Answer updated successfully"));
+    }
+
+    @DeleteMapping("/answers/{answerId}")
+    @Operation(summary = "Delete an existing answer (Author or Admin)")
+    public ResponseEntity<ApiResponse<Void>> deleteAnswer(
+            @PathVariable Long answerId,
+            @AuthenticationPrincipal UserPrincipal principal,
+            HttpServletRequest servletRequest
+    ) {
+        User user = userRepository.getReferenceById(principal.getId());
+        forumService.deleteAnswer(answerId, user, servletRequest.getRemoteAddr());
+        return ResponseEntity.ok(ApiResponse.success(null, "Answer deleted successfully"));
+    }
+
+    @GetMapping("/search")
+    @Operation(summary = "Search discussion questions by keyword and optional subject with pagination")
+    public ResponseEntity<ApiResponse<org.springframework.data.domain.Page<QuestionDto>>> searchQuestions(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) Integer subjectId,
+            @org.springframework.data.web.PageableDefault(size = 20) org.springframework.data.domain.Pageable pageable
+    ) {
+        org.springframework.data.domain.Page<QuestionDto> questions = forumService.searchQuestions(q, subjectId, pageable);
+        return ResponseEntity.ok(ApiResponse.success(questions, "Search results retrieved"));
     }
 }
