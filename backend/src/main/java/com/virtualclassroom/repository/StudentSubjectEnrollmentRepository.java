@@ -15,3 +15,4 @@ public interface StudentSubjectEnrollmentRepository extends JpaRepository<Studen
     boolean existsByStudentIdAndSubjectId(Long studentId, Integer subjectId);
     boolean existsByStudentIdAndSubjectIdAndAcademicTerm(Long studentId, Integer subjectId, String academicTerm);
 }
+

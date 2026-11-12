@@ -16,3 +16,4 @@ public interface ExaminationRepository extends JpaRepository<Examination, Long> 
     List<Examination> findByCreatorIdOrderByCreatedAtDesc(Long creatorId);
     List<Examination> findBySubjectIdInOrderByScheduledAtAsc(Collection<Integer> subjectIds);
 }
+

@@ -117,3 +117,4 @@ To guarantee sub-10ms query execution across high-concurrency educational worklo
 2. **Direct Connection (Port 5432)**:
    - Used exclusively during Flyway migrations and administrative maintenance.
    - Supports transactional DDL locks (`pg_locks`), prepared statement caches, and schema validation.
+

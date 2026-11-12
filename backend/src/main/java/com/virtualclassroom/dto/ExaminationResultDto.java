@@ -70,3 +70,4 @@ public class ExaminationResultDto {
     public Instant getGradedAt() { return gradedAt; }
     public void setGradedAt(Instant gradedAt) { this.gradedAt = gradedAt; }
 }
+

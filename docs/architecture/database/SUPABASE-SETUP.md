@@ -58,25 +58,51 @@ spring:
     password: ${SPRING_DATASOURCE_PASSWORD:postgres}
 ```
 
-### 3.2 Production Supabase Profile (`prod` / `render`)
-Configured via environment variables supplied in Render:
+### 3.2 Production Supabase Profile (`prod`)
+Configured via `application-prod.yml` and environment variables supplied in Render:
 ```yaml
 spring:
   datasource:
-    url: ${SPRING_DATASOURCE_URL}
-    username: ${SPRING_DATASOURCE_USERNAME}
-    password: ${SPRING_DATASOURCE_PASSWORD}
+    url: ${DATABASE_URL}
+    username: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
+    driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: ${DB_POOL_MAX:10}
       minimum-idle: ${DB_POOL_MIN:2}
       idle-timeout: 300000
       max-lifetime: 1200000
       connection-timeout: 20000
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
   flyway:
     enabled: true
     baseline-on-migrate: true
     locations: classpath:db/migration
+
+app:
+  jwt:
+    secret: ${JWT_SECRET}
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
 ```
+
+### 3.3 Render Environment Variables Specification
+
+When deploying the backend web service on **Render**, configure the following environment variables in the Render Dashboard (**Environment Settings**):
+
+| Environment Variable | Example / Value | Description |
+|:---|:---|:---|
+| `SPRING_PROFILES_ACTIVE` | `prod` | Activates `application-prod.yml`. |
+| `DATABASE_URL` | `jdbc:postgresql://aws-0-us-east-1.pooler.supabase.com:6543/postgres?sslmode=require&prepareThreshold=0` | Pooled connection string pointing to Supavisor transaction pooler. |
+| `DATABASE_USERNAME` | `postgres.your-project-ref` | Supabase pooler username (includes project reference tenant). |
+| `DATABASE_PASSWORD` | `<SUPABASE_DB_PASSWORD>` | External database password (never committed to repository). |
+| `JWT_SECRET` | `<HEX_OR_BASE64_64_CHAR_SECRET>` | Cryptographically random secret for HMAC-SHA256 JWT signing. |
+| `JWT_EXPIRATION_MS` | `86400000` | 24 hours in milliseconds. |
+| `CORS_ALLOWED_ORIGINS` | `https://virtualclassroom.onrender.com,http://localhost:3000` | Whitelist of frontend origins permitted to access REST API. |
+| `SERVER_PORT` | `8080` | Port configured on Render container. |
+
 
 ---
 
@@ -134,3 +160,4 @@ To avoid bottlenecking the Spring Boot application server with large multi-megab
      - `submissions/{assignmentId}/{studentId}/{timestamp}-{filename}`
 3. **MIME Type Validation**:
    - Both client and backend validate MIME types against an explicit whitelist before permitting upload generation.
+

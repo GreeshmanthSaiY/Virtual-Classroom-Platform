@@ -36,3 +36,4 @@ public class RecordGradeRequest {
     public String getRemarks() { return remarks; }
     public void setRemarks(String remarks) { this.remarks = remarks; }
 }
+

@@ -6,3 +6,4 @@ public enum ExamType {
     FINAL,
     ASSESSMENT
 }
+

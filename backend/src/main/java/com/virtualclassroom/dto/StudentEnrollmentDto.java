@@ -64,3 +64,4 @@ public class StudentEnrollmentDto {
     public Instant getEnrolledAt() { return enrolledAt; }
     public void setEnrolledAt(Instant enrolledAt) { this.enrolledAt = enrolledAt; }
 }
+

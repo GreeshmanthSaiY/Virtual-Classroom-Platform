@@ -193,15 +193,16 @@ class AuthServiceTest {
     @DisplayName("Refresh token rotation issues new access and refresh token, revoking old")
     void refreshToken_ValidToken_RotatesSuccessfully() {
         String oldRawToken = "valid-refresh-token-xyz";
+        String oldHashedToken = authService.hashToken(oldRawToken);
         RefreshToken existingToken = RefreshToken.builder()
                 .id(1L)
-                .tokenHash(oldRawToken)
+                .tokenHash(oldHashedToken)
                 .user(approvedStudent)
                 .expiresAt(java.time.Instant.now().plusSeconds(3600))
                 .revoked(false)
                 .build();
 
-        when(refreshTokenRepository.findByTokenHash(oldRawToken)).thenReturn(Optional.of(existingToken));
+        when(refreshTokenRepository.findByTokenHash(oldHashedToken)).thenReturn(Optional.of(existingToken));
         when(refreshTokenRepository.save(any(RefreshToken.class))).thenAnswer(i -> i.getArgument(0));
 
         AuthResponse response = authService.refreshToken(oldRawToken, "127.0.0.1");
@@ -215,18 +216,85 @@ class AuthServiceTest {
     }
 
     @Test
+    @DisplayName("Replay attack with revoked refresh token revokes all active tokens for that user")
+    void refreshToken_ReplayAttack_RevokesAllUserTokens() {
+        String compromisedToken = "compromised-token-123";
+        String hashedToken = authService.hashToken(compromisedToken);
+        RefreshToken revokedToken = RefreshToken.builder()
+                .id(10L)
+                .tokenHash(hashedToken)
+                .user(approvedStudent)
+                .expiresAt(java.time.Instant.now().plusSeconds(3600))
+                .revoked(true) // already revoked!
+                .build();
+
+        when(refreshTokenRepository.findByTokenHash(hashedToken)).thenReturn(Optional.of(revokedToken));
+
+        org.springframework.security.authentication.BadCredentialsException ex = assertThrows(
+                org.springframework.security.authentication.BadCredentialsException.class, () ->
+                        authService.refreshToken(compromisedToken, "127.0.0.1"));
+
+        assertTrue(ex.getMessage().contains("Revoked session token reuse detected"));
+        verify(refreshTokenRepository).revokeAllActiveByUserId(approvedStudent.getId());
+    }
+
+    @Test
+    @DisplayName("Expired refresh token throws BadCredentialsException")
+    void refreshToken_ExpiredToken_ThrowsBadCredentialsException() {
+        String expiredRawToken = "expired-token-456";
+        String hashedToken = authService.hashToken(expiredRawToken);
+        RefreshToken expiredToken = RefreshToken.builder()
+                .id(11L)
+                .tokenHash(hashedToken)
+                .user(approvedStudent)
+                .expiresAt(java.time.Instant.now().minusSeconds(3600))
+                .revoked(false)
+                .build();
+
+        when(refreshTokenRepository.findByTokenHash(hashedToken)).thenReturn(Optional.of(expiredToken));
+
+        org.springframework.security.authentication.BadCredentialsException ex = assertThrows(
+                org.springframework.security.authentication.BadCredentialsException.class, () ->
+                        authService.refreshToken(expiredRawToken, "127.0.0.1"));
+
+        assertTrue(ex.getMessage().contains("expired"));
+    }
+
+    @Test
+    @DisplayName("Refresh token for unapproved user throws IllegalStateException")
+    void refreshToken_UnapprovedUser_ThrowsIllegalStateException() {
+        String rawToken = "token-for-pending";
+        String hashedToken = authService.hashToken(rawToken);
+        RefreshToken token = RefreshToken.builder()
+                .id(12L)
+                .tokenHash(hashedToken)
+                .user(pendingStudent)
+                .expiresAt(java.time.Instant.now().plusSeconds(3600))
+                .revoked(false)
+                .build();
+
+        when(refreshTokenRepository.findByTokenHash(hashedToken)).thenReturn(Optional.of(token));
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () ->
+                authService.refreshToken(rawToken, "127.0.0.1"));
+
+        assertTrue(ex.getMessage().contains("Account is not active"));
+    }
+
+    @Test
     @DisplayName("Revoke refresh token marks token as revoked")
     void revokeRefreshToken_ValidToken_MarksAsRevoked() {
         String rawToken = "token-to-revoke";
+        String hashedToken = authService.hashToken(rawToken);
         RefreshToken existingToken = RefreshToken.builder()
                 .id(2L)
-                .tokenHash(rawToken)
+                .tokenHash(hashedToken)
                 .user(approvedStudent)
                 .expiresAt(java.time.Instant.now().plusSeconds(3600))
                 .revoked(false)
                 .build();
 
-        when(refreshTokenRepository.findByTokenHash(rawToken)).thenReturn(Optional.of(existingToken));
+        when(refreshTokenRepository.findByTokenHash(hashedToken)).thenReturn(Optional.of(existingToken));
 
         authService.revokeRefreshToken(rawToken);
 

@@ -312,3 +312,4 @@ Immutable compliance and security activity ledger.
 | `details` | `TEXT` | Yes | NULL | Text/JSON | Descriptive metadata and payload changes. |
 | `ip_address` | `VARCHAR(45)` | Yes | NULL | IPv4 / IPv6 | Network origin address of request. |
 | `created_at` | `TIMESTAMPTZ` | No | `CURRENT_TIMESTAMP` | System managed | Immutable chronological timestamp. |
+

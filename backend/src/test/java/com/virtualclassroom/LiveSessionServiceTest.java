@@ -136,6 +136,81 @@ class LiveSessionServiceTest {
     }
 
     @Test
+    @DisplayName("Scheduling session with end time before start time throws IllegalArgumentException")
+    void scheduleSession_EndTimeBeforeStartTime_ThrowsIllegalArgumentException() {
+        CreateLiveSessionRequest req = new CreateLiveSessionRequest();
+        req.setSubjectId(10);
+        req.setTitle("Intro to Indexing");
+        Instant now = Instant.now().plusSeconds(3600);
+        req.setScheduledStart(now);
+        req.setScheduledEnd(now.minusSeconds(1800)); // end is before start
+
+        when(facultyAssignmentRepository.existsByFacultyIdAndSubjectId(100L, 10)).thenReturn(true);
+
+        assertThrows(IllegalArgumentException.class, () ->
+                liveSessionService.scheduleLiveSession(req, facultyUser, "127.0.0.1"));
+    }
+
+    @Test
+    @DisplayName("Scheduling session that overlaps with existing active session throws IllegalArgumentException")
+    void scheduleSession_OverlappingSession_ThrowsIllegalArgumentException() {
+        Instant start = Instant.now().plusSeconds(3600);
+        Instant end = start.plusSeconds(3600);
+
+        CreateLiveSessionRequest req = new CreateLiveSessionRequest();
+        req.setSubjectId(10);
+        req.setTitle("Duplicate Session");
+        req.setScheduledStart(start);
+        req.setScheduledEnd(end);
+
+        when(facultyAssignmentRepository.existsByFacultyIdAndSubjectId(100L, 10)).thenReturn(true);
+        when(liveSessionRepository.existsOverlappingSession(10, start, end)).thenReturn(true);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+                liveSessionService.scheduleLiveSession(req, facultyUser, "127.0.0.1"));
+
+        assertTrue(ex.getMessage().contains("overlapping"));
+    }
+
+    @Test
+    @DisplayName("Attempting to alter a COMPLETED session throws IllegalStateException")
+    void updateSessionStatus_CompletedSession_ThrowsIllegalStateException() {
+        LiveSession session = LiveSession.builder()
+                .id(400L)
+                .subject(subject)
+                .host(facultyUser)
+                .title("Intro to Indexing")
+                .status(LiveSessionStatus.COMPLETED)
+                .build();
+
+        when(liveSessionRepository.findById(400L)).thenReturn(Optional.of(session));
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () ->
+                liveSessionService.updateSessionStatus(400L, LiveSessionStatus.LIVE, facultyUser, "127.0.0.1"));
+
+        assertTrue(ex.getMessage().contains("already COMPLETED"));
+    }
+
+    @Test
+    @DisplayName("Invalid state transition from SCHEDULED to COMPLETED throws IllegalStateException")
+    void updateSessionStatus_InvalidTransition_ThrowsIllegalStateException() {
+        LiveSession session = LiveSession.builder()
+                .id(400L)
+                .subject(subject)
+                .host(facultyUser)
+                .title("Intro to Indexing")
+                .status(LiveSessionStatus.SCHEDULED)
+                .build();
+
+        when(liveSessionRepository.findById(400L)).thenReturn(Optional.of(session));
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () ->
+                liveSessionService.updateSessionStatus(400L, LiveSessionStatus.COMPLETED, facultyUser, "127.0.0.1"));
+
+        assertTrue(ex.getMessage().contains("Invalid status transition"));
+    }
+
+    @Test
     @DisplayName("Student cannot view sessions for unenrolled subject")
     void getSessionsForSubject_UnenrolledStudent_ThrowsAccessDeniedException() {
         when(enrollmentRepository.existsByStudentIdAndSubjectId(200L, 10)).thenReturn(false);

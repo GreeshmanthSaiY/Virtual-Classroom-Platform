@@ -34,3 +34,4 @@ public class UpdateProfileRequest {
     public String getOfficeHours() { return officeHours; }
     public void setOfficeHours(String officeHours) { this.officeHours = officeHours; }
 }
+

@@ -99,6 +99,8 @@ Endpoints that return paged collections accept `page` (0-indexed, default 0), `s
 
 ### 2.6 Live Classroom Sessions (`/api/v1/sessions`)
 
+> **Architectural Scope Note**: The platform provides **session scheduling, lifecycle state management, and virtual meeting room orchestration**. Video conferencing is mediated via external or embedded room bridges (e.g. Jitsi Meet room URLs); the platform does not run an internal WebRTC SFU media relay server.
+
 | Method | Endpoint | Access | Request Body | Response Body | Description |
 |:---|:---|:---|:---|:---|:---|
 | `POST`| `/api/v1/sessions` | Assigned Faculty / Admin | `CreateLiveSessionRequest` | `LiveSessionDto` | Schedules live lecture meeting (Jitsi / WebRTC). |
@@ -149,3 +151,4 @@ Endpoints that return paged collections accept `page` (0-indexed, default 0), `s
 | View Personal Grade Transcript | - | `READ` | - | - | - | `ALL` |
 | Approve / Reject Users | - | - | - | - | - | `ALL` |
 | View Audit Logs | - | - | - | - | - | `ALL` |
+

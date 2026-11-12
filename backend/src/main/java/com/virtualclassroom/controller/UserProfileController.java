@@ -53,3 +53,4 @@ public class UserProfileController {
         return ResponseEntity.ok(ApiResponse.success(updated, "Profile updated successfully"));
     }
 }
+

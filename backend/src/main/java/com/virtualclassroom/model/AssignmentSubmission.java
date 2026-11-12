@@ -118,3 +118,4 @@ public class AssignmentSubmission {
     public SubmissionStatus getStatus() { return status; }
     public void setStatus(SubmissionStatus status) { this.status = status; }
 }
+

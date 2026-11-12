@@ -67,3 +67,4 @@ public class EnrollmentController {
         return ResponseEntity.ok(ApiResponse.success(enrollments, "Subject enrollments retrieved successfully"));
     }
 }
+

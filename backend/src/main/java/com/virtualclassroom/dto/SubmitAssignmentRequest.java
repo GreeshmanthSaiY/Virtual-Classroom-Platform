@@ -22,3 +22,4 @@ public class SubmitAssignmentRequest {
     public String getFileUrl() { return fileUrl; }
     public void setFileUrl(String fileUrl) { this.fileUrl = fileUrl; }
 }
+

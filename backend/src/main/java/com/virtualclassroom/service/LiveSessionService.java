@@ -52,6 +52,17 @@ public class LiveSessionService {
             }
         }
 
+        if (request.getScheduledStart() == null || request.getScheduledEnd() == null) {
+            throw new IllegalArgumentException("Session start and end times are required");
+        }
+        if (!request.getScheduledEnd().isAfter(request.getScheduledStart())) {
+            throw new IllegalArgumentException("Session end time must be strictly after start time");
+        }
+
+        if (liveSessionRepository.existsOverlappingSession(request.getSubjectId(), request.getScheduledStart(), request.getScheduledEnd())) {
+            throw new IllegalArgumentException("An active overlapping live session is already scheduled for this subject");
+        }
+
         Subject subject = subjectRepository.findById(request.getSubjectId())
                 .orElseThrow(() -> new IllegalArgumentException("Subject not found with ID: " + request.getSubjectId()));
 
@@ -97,6 +108,27 @@ public class LiveSessionService {
             throw new AccessDeniedException("Access denied: Only the host or an administrator can update session status");
         }
 
+        LiveSessionStatus currentStatus = session.getStatus();
+
+        // Terminal state guards
+        if (currentStatus == LiveSessionStatus.COMPLETED) {
+            throw new IllegalStateException("Cannot change status of a session that is already COMPLETED");
+        }
+        if (currentStatus == LiveSessionStatus.CANCELLED) {
+            throw new IllegalStateException("Cannot change status of a session that has been CANCELLED");
+        }
+
+        // State machine transition validation
+        if (currentStatus == LiveSessionStatus.SCHEDULED) {
+            if (newStatus != LiveSessionStatus.LIVE && newStatus != LiveSessionStatus.CANCELLED) {
+                throw new IllegalStateException("Invalid status transition from SCHEDULED to " + newStatus + ". Permissible: LIVE, CANCELLED");
+            }
+        } else if (currentStatus == LiveSessionStatus.LIVE) {
+            if (newStatus != LiveSessionStatus.COMPLETED && newStatus != LiveSessionStatus.CANCELLED) {
+                throw new IllegalStateException("Invalid status transition from LIVE to " + newStatus + ". Permissible: COMPLETED, CANCELLED");
+            }
+        }
+
         session.setStatus(newStatus);
         LiveSession updated = liveSessionRepository.save(session);
 
@@ -121,3 +153,4 @@ public class LiveSessionService {
         }
     }
 }
+

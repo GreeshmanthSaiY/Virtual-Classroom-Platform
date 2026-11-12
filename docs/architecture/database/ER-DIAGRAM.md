@@ -320,3 +320,4 @@ erDiagram
 | `qa_threads` | `qa_replies` | `thread_id` | 1 : 0..N | `CASCADE` | Discussion reply cascades from main parent thread. |
 | `users` | `notifications` | `user_id` | 1 : 0..N | `CASCADE` | User-specific alert messages cascade on account deletion. |
 | `users` | `audit_logs` | `user_id` | 1 : 0..N | `SET NULL` | Regulatory audit log entries remain immutable for compliance. |
+

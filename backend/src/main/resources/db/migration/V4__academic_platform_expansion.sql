@@ -157,3 +157,4 @@ CREATE TABLE IF NOT EXISTS examination_results (
 
 CREATE INDEX IF NOT EXISTS idx_exam_results_exam ON examination_results(examination_id);
 CREATE INDEX IF NOT EXISTS idx_exam_results_student ON examination_results(student_id);
+

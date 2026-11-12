@@ -77,3 +77,4 @@ public class StudentSubjectEnrollment {
     public Instant getEnrolledAt() { return enrolledAt; }
     public void setEnrolledAt(Instant enrolledAt) { this.enrolledAt = enrolledAt; }
 }
+

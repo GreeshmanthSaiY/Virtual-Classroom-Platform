@@ -17,3 +17,4 @@ public interface ExaminationResultRepository extends JpaRepository<ExaminationRe
     Optional<ExaminationResult> findByExaminationIdAndStudentId(Long examinationId, Long studentId);
     boolean existsByExaminationIdAndStudentId(Long examinationId, Long studentId);
 }
+

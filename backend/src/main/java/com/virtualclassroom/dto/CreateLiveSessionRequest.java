@@ -47,3 +47,4 @@ public class CreateLiveSessionRequest {
     public Instant getScheduledEnd() { return scheduledEnd; }
     public void setScheduledEnd(Instant scheduledEnd) { this.scheduledEnd = scheduledEnd; }
 }
+

@@ -94,3 +94,4 @@ public class ExaminationResult {
     public Instant getGradedAt() { return gradedAt; }
     public void setGradedAt(Instant gradedAt) { this.gradedAt = gradedAt; }
 }
+

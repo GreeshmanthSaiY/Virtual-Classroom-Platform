@@ -44,3 +44,4 @@ public class CreateAssignmentRequest {
     public String getAttachmentUrl() { return attachmentUrl; }
     public void setAttachmentUrl(String attachmentUrl) { this.attachmentUrl = attachmentUrl; }
 }
+

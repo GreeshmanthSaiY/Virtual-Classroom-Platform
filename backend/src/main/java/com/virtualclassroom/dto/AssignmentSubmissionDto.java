@@ -82,3 +82,4 @@ public class AssignmentSubmissionDto {
     public SubmissionStatus getStatus() { return status; }
     public void setStatus(SubmissionStatus status) { this.status = status; }
 }
+

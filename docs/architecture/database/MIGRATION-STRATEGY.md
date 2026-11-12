@@ -65,3 +65,4 @@ In the event of a failed migration execution (e.g., syntax error, connection tim
 2. **Forward Remediation**:
    If a migration succeeded partially in a non-transactional DDL environment:
    - Create a targeted forward migration `V<N+1>__fix_...sql` that checks for column existence via `IF NOT EXISTS` before executing.
+

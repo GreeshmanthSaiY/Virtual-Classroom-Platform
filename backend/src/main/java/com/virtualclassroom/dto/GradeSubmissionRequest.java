@@ -18,3 +18,4 @@ public class GradeSubmissionRequest {
     public String getFeedback() { return feedback; }
     public void setFeedback(String feedback) { this.feedback = feedback; }
 }
+

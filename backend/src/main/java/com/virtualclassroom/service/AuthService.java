@@ -14,13 +14,19 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Base64;
 import java.util.List;
-import java.util.UUID;
 
 @Service
 public class AuthService {
+
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final AuthenticationManager authenticationManager;
     private final UserRepository userRepository;
@@ -103,12 +109,13 @@ public class AuthService {
 
         String jwt = tokenProvider.generateToken(authentication);
 
-        String refreshTokenString = null;
+        String rawRefreshToken = null;
         if (refreshTokenRepository != null) {
-            refreshTokenString = UUID.randomUUID().toString();
+            rawRefreshToken = generateSecureToken();
+            String hashedToken = hashToken(rawRefreshToken);
             RefreshToken refreshToken = RefreshToken.builder()
                     .user(user)
-                    .tokenHash(refreshTokenString)
+                    .tokenHash(hashedToken)
                     .expiresAt(Instant.now().plus(7, ChronoUnit.DAYS))
                     .build();
             refreshTokenRepository.save(refreshToken);
@@ -124,38 +131,49 @@ public class AuthService {
                 .fullName(user.getFullName())
                 .role(user.getRole().name())
                 .status(user.getStatus().name())
-                .refreshToken(refreshTokenString)
+                .refreshToken(rawRefreshToken)
                 .build();
     }
 
     @Transactional
-    public AuthResponse refreshToken(String tokenString, String ipAddress) {
+    public AuthResponse refreshToken(String rawToken, String ipAddress) {
         if (refreshTokenRepository == null) {
             throw new IllegalStateException("Refresh token repository is not configured");
         }
 
-        RefreshToken storedToken = refreshTokenRepository.findByTokenHash(tokenString)
+        String hashedToken = hashToken(rawToken);
+        RefreshToken storedToken = refreshTokenRepository.findByTokenHash(hashedToken)
                 .orElseThrow(() -> new BadCredentialsException("Invalid refresh token"));
 
-        if (storedToken.isRevoked() || storedToken.getExpiresAt().isBefore(Instant.now())) {
-            throw new BadCredentialsException("Refresh token is expired or revoked");
+        User user = storedToken.getUser();
+
+        // REPLAY DETECTION / COMPROMISED TOKEN REUSE
+        if (storedToken.isRevoked()) {
+            // A revoked token was replayed. Family revocation breach mitigation:
+            refreshTokenRepository.revokeAllActiveByUserId(user.getId());
+            auditLogService.logAction(user, "TOKEN_REPLAY_DETECTED", "RefreshToken",
+                    storedToken.getId().toString(), "Revoked token replayed. Terminated all active user sessions.", ipAddress);
+            throw new BadCredentialsException("Security breach warning: Revoked session token reuse detected. All active sessions have been invalidated.");
         }
 
-        User user = storedToken.getUser();
+        if (storedToken.getExpiresAt().isBefore(Instant.now())) {
+            throw new BadCredentialsException("Refresh token has expired");
+        }
+
         if (user.getStatus() != UserStatus.APPROVED) {
-            throw new IllegalStateException("Account is not active");
+            throw new IllegalStateException("Account is not active (status: " + user.getStatus() + ")");
         }
 
         // Revoke the old token (rotation)
         storedToken.setRevoked(true);
         refreshTokenRepository.save(storedToken);
 
-        // Issue new JWT and new rotated refresh token
+        // Issue new JWT access token and new cryptographically strong refresh token
         String newJwt = tokenProvider.generateTokenFromUser(user);
-        String newRefreshTokenString = UUID.randomUUID().toString();
+        String newRawRefreshToken = generateSecureToken();
         RefreshToken newRefreshToken = RefreshToken.builder()
                 .user(user)
-                .tokenHash(newRefreshTokenString)
+                .tokenHash(hashToken(newRawRefreshToken))
                 .expiresAt(Instant.now().plus(7, ChronoUnit.DAYS))
                 .build();
         refreshTokenRepository.save(newRefreshToken);
@@ -170,17 +188,41 @@ public class AuthService {
                 .fullName(user.getFullName())
                 .role(user.getRole().name())
                 .status(user.getStatus().name())
-                .refreshToken(newRefreshTokenString)
+                .refreshToken(newRawRefreshToken)
                 .build();
     }
 
     @Transactional
-    public void revokeRefreshToken(String tokenString) {
-        if (refreshTokenRepository != null) {
-            refreshTokenRepository.findByTokenHash(tokenString).ifPresent(token -> {
+    public void revokeRefreshToken(String rawToken) {
+        if (refreshTokenRepository != null && rawToken != null && !rawToken.isBlank()) {
+            String hashedToken = hashToken(rawToken);
+            refreshTokenRepository.findByTokenHash(hashedToken).ifPresent(token -> {
                 token.setRevoked(true);
                 refreshTokenRepository.save(token);
             });
+        }
+    }
+
+    public String generateSecureToken() {
+        byte[] randomBytes = new byte[32];
+        SECURE_RANDOM.nextBytes(randomBytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
+    }
+
+    public String hashToken(String rawToken) {
+        if (rawToken == null || rawToken.isBlank()) {
+            throw new BadCredentialsException("Invalid refresh token");
+        }
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hashBytes = digest.digest(rawToken.getBytes(StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder(64);
+            for (byte b : hashBytes) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 algorithm unavailable", e);
         }
     }
 
