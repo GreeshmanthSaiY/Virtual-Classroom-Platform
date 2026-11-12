@@ -1,10 +1,11 @@
 package com.virtualclassroom.model;
 
 import jakarta.persistence.*;
+import org.springframework.data.domain.Persistable;
 
 @Entity
 @Table(name = "student_profiles")
-public class StudentProfile {
+public class StudentProfile implements Persistable<Long> {
 
     @Id
     @Column(name = "user_id")
@@ -14,6 +15,25 @@ public class StudentProfile {
     @MapsId
     @JoinColumn(name = "user_id")
     private User user;
+
+    @Transient
+    private boolean isNew = true;
+
+    @Override
+    public Long getId() {
+        return userId;
+    }
+
+    @Override
+    public boolean isNew() {
+        return isNew;
+    }
+
+    @PostPersist
+    @PostLoad
+    void markNotNew() {
+        this.isNew = false;
+    }
 
     @Column(name = "roll_number", nullable = false, unique = true, length = 50)
     private String rollNumber;

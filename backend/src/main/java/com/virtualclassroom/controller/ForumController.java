@@ -62,7 +62,7 @@ public class ForumController {
             @AuthenticationPrincipal UserPrincipal principal,
             HttpServletRequest servletRequest
     ) {
-        User user = userRepository.getReferenceById(principal.getId());
+        User user = userRepository.findById(principal.getId()).orElseThrow(() -> new IllegalArgumentException("User not found"));
         QuestionDto question = forumService.postQuestion(request, user, servletRequest.getRemoteAddr());
         return ResponseEntity.ok(ApiResponse.success(question, "Question posted successfully"));
     }
@@ -75,7 +75,7 @@ public class ForumController {
             @AuthenticationPrincipal UserPrincipal principal,
             HttpServletRequest servletRequest
     ) {
-        User user = userRepository.getReferenceById(principal.getId());
+        User user = userRepository.findById(principal.getId()).orElseThrow(() -> new IllegalArgumentException("User not found"));
         AnswerDto answer = forumService.postAnswer(questionId, request, user, servletRequest.getRemoteAddr());
         return ResponseEntity.ok(ApiResponse.success(answer, "Answer submitted successfully"));
     }
@@ -86,7 +86,7 @@ public class ForumController {
             @PathVariable Long questionId,
             @AuthenticationPrincipal UserPrincipal principal
     ) {
-        User user = userRepository.getReferenceById(principal.getId());
+        User user = userRepository.findById(principal.getId()).orElseThrow(() -> new IllegalArgumentException("User not found"));
         forumService.markQuestionResolved(questionId, user);
         return ResponseEntity.ok(ApiResponse.success(null, "Question marked as resolved"));
     }
@@ -97,7 +97,7 @@ public class ForumController {
             @PathVariable Long answerId,
             @AuthenticationPrincipal UserPrincipal principal
     ) {
-        User user = userRepository.getReferenceById(principal.getId());
+        User user = userRepository.findById(principal.getId()).orElseThrow(() -> new IllegalArgumentException("User not found"));
         forumService.markAnswerAccepted(answerId, user);
         return ResponseEntity.ok(ApiResponse.success(null, "Answer accepted successfully"));
     }
@@ -110,7 +110,7 @@ public class ForumController {
             @AuthenticationPrincipal UserPrincipal principal,
             HttpServletRequest servletRequest
     ) {
-        User user = userRepository.getReferenceById(principal.getId());
+        User user = userRepository.findById(principal.getId()).orElseThrow(() -> new IllegalArgumentException("User not found"));
         AnswerDto answer = forumService.endorseAnswer(answerId, user, servletRequest.getRemoteAddr());
         return ResponseEntity.ok(ApiResponse.success(answer, "Answer endorsed successfully"));
     }
@@ -123,7 +123,7 @@ public class ForumController {
             @AuthenticationPrincipal UserPrincipal principal,
             HttpServletRequest servletRequest
     ) {
-        User user = userRepository.getReferenceById(principal.getId());
+        User user = userRepository.findById(principal.getId()).orElseThrow(() -> new IllegalArgumentException("User not found"));
         QuestionDto question = forumService.updateQuestion(questionId, request, user, servletRequest.getRemoteAddr());
         return ResponseEntity.ok(ApiResponse.success(question, "Question updated successfully"));
     }
@@ -135,7 +135,7 @@ public class ForumController {
             @AuthenticationPrincipal UserPrincipal principal,
             HttpServletRequest servletRequest
     ) {
-        User user = userRepository.getReferenceById(principal.getId());
+        User user = userRepository.findById(principal.getId()).orElseThrow(() -> new IllegalArgumentException("User not found"));
         forumService.deleteQuestion(questionId, user, servletRequest.getRemoteAddr());
         return ResponseEntity.ok(ApiResponse.success(null, "Question deleted successfully"));
     }
@@ -148,7 +148,7 @@ public class ForumController {
             @AuthenticationPrincipal UserPrincipal principal,
             HttpServletRequest servletRequest
     ) {
-        User user = userRepository.getReferenceById(principal.getId());
+        User user = userRepository.findById(principal.getId()).orElseThrow(() -> new IllegalArgumentException("User not found"));
         AnswerDto answer = forumService.updateAnswer(answerId, request, user, servletRequest.getRemoteAddr());
         return ResponseEntity.ok(ApiResponse.success(answer, "Answer updated successfully"));
     }
@@ -160,7 +160,7 @@ public class ForumController {
             @AuthenticationPrincipal UserPrincipal principal,
             HttpServletRequest servletRequest
     ) {
-        User user = userRepository.getReferenceById(principal.getId());
+        User user = userRepository.findById(principal.getId()).orElseThrow(() -> new IllegalArgumentException("User not found"));
         forumService.deleteAnswer(answerId, user, servletRequest.getRemoteAddr());
         return ResponseEntity.ok(ApiResponse.success(null, "Answer deleted successfully"));
     }

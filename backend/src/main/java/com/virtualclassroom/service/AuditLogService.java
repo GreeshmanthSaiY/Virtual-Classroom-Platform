@@ -22,7 +22,7 @@ public class AuditLogService {
     }
 
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional
     public void logAction(User actor, String action, String targetEntity, String targetId, String details, String ipAddress) {
         try {
             AuditLog auditLog = AuditLog.builder()

@@ -45,7 +45,7 @@ public class StorageController {
             @RequestParam(value = "folder", defaultValue = "general") String folder,
             @AuthenticationPrincipal UserPrincipal principal
     ) {
-        User user = (userRepository != null && principal != null) ? userRepository.getReferenceById(principal.getId()) : null;
+        User user = (userRepository != null && principal != null) ? userRepository.findById(principal.getId()).orElse(null) : null;
         FileUploadResponse response = storageService.uploadFile(file, folder, user);
         return ResponseEntity.ok(ApiResponse.success(response, "File uploaded successfully"));
     }
@@ -57,7 +57,7 @@ public class StorageController {
             @Valid @RequestBody SignedUploadUrlRequest request,
             @AuthenticationPrincipal UserPrincipal principal
     ) {
-        User user = (userRepository != null && principal != null) ? userRepository.getReferenceById(principal.getId()) : null;
+        User user = (userRepository != null && principal != null) ? userRepository.findById(principal.getId()).orElse(null) : null;
         SignedUploadUrlResponse response = storageService.generateSignedUploadUrl(request, user);
         return ResponseEntity.ok(ApiResponse.success(response, "Signed upload URL generated"));
     }
@@ -107,7 +107,7 @@ public class StorageController {
             @RequestParam("path") String storagePath,
             @AuthenticationPrincipal UserPrincipal principal
     ) {
-        User user = (userRepository != null && principal != null) ? userRepository.getReferenceById(principal.getId()) : null;
+        User user = (userRepository != null && principal != null) ? userRepository.findById(principal.getId()).orElse(null) : null;
         storageService.deleteFile(storagePath, user);
         return ResponseEntity.ok(ApiResponse.success(null, "File deleted successfully"));
     }

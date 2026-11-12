@@ -76,7 +76,7 @@ public class CourseController {
             @AuthenticationPrincipal UserPrincipal principal,
             HttpServletRequest servletRequest
     ) {
-        User admin = (userRepository != null && principal != null) ? userRepository.getReferenceById(principal.getId()) : null;
+        User admin = (userRepository != null && principal != null) ? userRepository.findById(principal.getId()).orElse(null) : null;
         CourseDto course = courseService.archiveCourse(courseId, admin, servletRequest.getRemoteAddr());
         return ResponseEntity.ok(ApiResponse.success(course, "Course archived successfully"));
     }
@@ -89,7 +89,7 @@ public class CourseController {
             @AuthenticationPrincipal UserPrincipal principal,
             HttpServletRequest servletRequest
     ) {
-        User admin = (userRepository != null && principal != null) ? userRepository.getReferenceById(principal.getId()) : null;
+        User admin = (userRepository != null && principal != null) ? userRepository.findById(principal.getId()).orElse(null) : null;
         CourseDto course = courseService.unarchiveCourse(courseId, admin, servletRequest.getRemoteAddr());
         return ResponseEntity.ok(ApiResponse.success(course, "Course unarchived successfully"));
     }

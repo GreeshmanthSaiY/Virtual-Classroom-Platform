@@ -1,13 +1,14 @@
 package com.virtualclassroom.model;
 
 import jakarta.persistence.*;
+import org.springframework.data.domain.Persistable;
 
 import java.util.ArrayList;
 import java.util.List;
 
 @Entity
 @Table(name = "faculty_profiles")
-public class FacultyProfile {
+public class FacultyProfile implements Persistable<Long> {
 
     @Id
     @Column(name = "user_id")
@@ -17,6 +18,25 @@ public class FacultyProfile {
     @MapsId
     @JoinColumn(name = "user_id")
     private User user;
+
+    @Transient
+    private boolean isNew = true;
+
+    @Override
+    public Long getId() {
+        return userId;
+    }
+
+    @Override
+    public boolean isNew() {
+        return isNew;
+    }
+
+    @PostPersist
+    @PostLoad
+    void markNotNew() {
+        this.isNew = false;
+    }
 
     @Column(name = "employee_id", nullable = false, unique = true, length = 50)
     private String employeeId;

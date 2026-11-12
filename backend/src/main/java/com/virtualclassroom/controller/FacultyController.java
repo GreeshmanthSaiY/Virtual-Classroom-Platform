@@ -81,7 +81,7 @@ public class FacultyController {
             @AuthenticationPrincipal UserPrincipal principal,
             HttpServletRequest servletRequest
     ) {
-        User user = userRepository.getReferenceById(principal.getId());
+        User user = userRepository.findById(principal.getId()).orElseThrow(() -> new IllegalArgumentException("User not found"));
         StudyMaterialDto material = facultyService.uploadStudyMaterial(request, user, servletRequest.getRemoteAddr());
         return ResponseEntity.ok(ApiResponse.success(material, "Study material published successfully"));
     }
@@ -93,7 +93,7 @@ public class FacultyController {
             @AuthenticationPrincipal UserPrincipal principal,
             HttpServletRequest servletRequest
     ) {
-        User user = userRepository.getReferenceById(principal.getId());
+        User user = userRepository.findById(principal.getId()).orElseThrow(() -> new IllegalArgumentException("User not found"));
         VideoLectureDto lecture = facultyService.createVideoLecture(request, user, servletRequest.getRemoteAddr());
         return ResponseEntity.ok(ApiResponse.success(lecture, "Video lecture published successfully"));
     }
@@ -104,7 +104,7 @@ public class FacultyController {
             @PathVariable Long id,
             @AuthenticationPrincipal UserPrincipal principal
     ) {
-        User user = userRepository.getReferenceById(principal.getId());
+        User user = userRepository.findById(principal.getId()).orElseThrow(() -> new IllegalArgumentException("User not found"));
         facultyService.deleteMaterial(id, user);
         return ResponseEntity.ok(ApiResponse.success(null, "Study material deleted successfully"));
     }
@@ -115,7 +115,7 @@ public class FacultyController {
             @PathVariable Long id,
             @AuthenticationPrincipal UserPrincipal principal
     ) {
-        User user = userRepository.getReferenceById(principal.getId());
+        User user = userRepository.findById(principal.getId()).orElseThrow(() -> new IllegalArgumentException("User not found"));
         facultyService.deleteLecture(id, user);
         return ResponseEntity.ok(ApiResponse.success(null, "Video lecture deleted successfully"));
     }

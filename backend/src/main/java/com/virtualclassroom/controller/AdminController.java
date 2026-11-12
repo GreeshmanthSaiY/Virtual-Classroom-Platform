@@ -90,7 +90,7 @@ public class AdminController {
             @AuthenticationPrincipal UserPrincipal principal,
             HttpServletRequest servletRequest
     ) {
-        User admin = userRepository.getReferenceById(principal.getId());
+        User admin = userRepository.findById(principal.getId()).orElseThrow(() -> new IllegalArgumentException("User not found"));
         adminService.suspendUser(userId, request.getReason(), admin, servletRequest.getRemoteAddr());
         return ResponseEntity.ok(ApiResponse.success(null, "User suspended successfully"));
     }
@@ -102,7 +102,7 @@ public class AdminController {
             @AuthenticationPrincipal UserPrincipal principal,
             HttpServletRequest servletRequest
     ) {
-        User admin = userRepository.getReferenceById(principal.getId());
+        User admin = userRepository.findById(principal.getId()).orElseThrow(() -> new IllegalArgumentException("User not found"));
         adminService.reactivateUser(userId, admin, servletRequest.getRemoteAddr());
         return ResponseEntity.ok(ApiResponse.success(null, "User reactivated successfully"));
     }
@@ -115,7 +115,7 @@ public class AdminController {
             @AuthenticationPrincipal UserPrincipal principal,
             HttpServletRequest servletRequest
     ) {
-        User admin = userRepository.getReferenceById(principal.getId());
+        User admin = userRepository.findById(principal.getId()).orElseThrow(() -> new IllegalArgumentException("User not found"));
         adminService.assignFacultyToSubject(subjectId, request.getFacultyId(), request.getAcademicTerm(), admin, servletRequest.getRemoteAddr());
         return ResponseEntity.ok(ApiResponse.success(null, "Faculty assigned to subject successfully"));
     }
@@ -127,7 +127,7 @@ public class AdminController {
             @AuthenticationPrincipal UserPrincipal principal,
             HttpServletRequest servletRequest
     ) {
-        User admin = userRepository.getReferenceById(principal.getId());
+        User admin = userRepository.findById(principal.getId()).orElseThrow(() -> new IllegalArgumentException("User not found"));
         adminService.approveUsers(request.getUserIds(), admin, servletRequest.getRemoteAddr());
         return ResponseEntity.ok(ApiResponse.success(null, "Users approved successfully"));
     }
@@ -139,7 +139,7 @@ public class AdminController {
             @AuthenticationPrincipal UserPrincipal principal,
             HttpServletRequest servletRequest
     ) {
-        User admin = userRepository.getReferenceById(principal.getId());
+        User admin = userRepository.findById(principal.getId()).orElseThrow(() -> new IllegalArgumentException("User not found"));
         adminService.rejectUsers(request.getUserIds(), request.getReason(), admin, servletRequest.getRemoteAddr());
         return ResponseEntity.ok(ApiResponse.success(null, "Users rejected successfully"));
     }
