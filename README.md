@@ -16,9 +16,9 @@
 
 ## 🏛️ Architecture & Transformation
 
-This repository represents the full enterprise modernization of the legacy Virtual Classroom prototype. The legacy architecture (rated 1.5/10) suffered from raw JSP scriptlets, SQL string concatenation, plaintext credentials, and tight presentation coupling.
+This repository represents the full enterprise modernization of the legacy Virtual Classroom prototype. The legacy architecture suffered from raw JSP scriptlets, SQL string concatenation, plaintext credentials, and tight presentation coupling.
 
-The modernization delivers a verified **9.5/10 enterprise architectural standard**:
+The modernization delivers a verified enterprise architectural standard:
 
 ```
                                  [ Web Clients / Mobile Browsers ]
@@ -71,8 +71,8 @@ The modernization delivers a verified **9.5/10 enterprise architectural standard
 
 ```
 Virtual-Classroom-Platform/
-├── .github/workflows/          # GitHub Actions CI/CD workflows
-├── backend/                    # Spring Boot 3.4.3 REST API (Java 21)
+├── .github/workflows/          # GitHub Actions CI/CD workflows (CI, Staging, Production)
+├── backend/                    # Spring Boot 3.4.3 REST API (Java 21 LTS)
 │   ├── src/main/java/com/virtualclassroom/
 │   │   ├── config/             # OpenAPI / Swagger configuration
 │   │   ├── controller/         # REST Controllers (Auth, Admin, Faculty, Student, Forum)
@@ -102,7 +102,7 @@ Virtual-Classroom-Platform/
 │
 ├── database/
 │   ├── migrations/             # Canonical PostgreSQL Flyway migrations
-│   └── legacy/                 # Preserved legacy MySQL scripts and JSP baseline
+│   └── legacy/                 # Preserved legacy MySQL scripts and JSP prototype
 │
 ├── infrastructure/
 │   └── docker/                 # Production multi-stage Dockerfiles & Docker Compose
@@ -117,12 +117,29 @@ Virtual-Classroom-Platform/
 
 ---
 
+## 🛠️ Tech Stack (Modern Platform)
+
+| Layer | Technology | Description |
+|---|---|---|
+| **Frontend Framework** | React 18, TypeScript 5, Vite 6 | Type-safe Single Page Application |
+| **Styling & Design** | Tailwind CSS 3.4, Lucide React Icons | Responsive modern design system |
+| **State & API** | Axios, React Router 6, TanStack Query | Client-side routing and HTTP interceptors |
+| **Backend Framework** | Spring Boot 3.4.3 (Java 21 LTS) | Modern RESTful microservices architecture |
+| **Security** | Spring Security 6, JJWT (HMAC-SHA256), BCrypt | Stateless JWT Bearer auth, RBAC |
+| **Database & ORM** | PostgreSQL 15+ (Supabase), Spring Data JPA | Relational persistence, connection pooling |
+| **Database Migrations**| Flyway Migration Engine | Deterministic, version-controlled schema evolution |
+| **Containerization** | Docker, Docker Compose | Multi-stage production container images |
+| **CI/CD** | GitHub Actions | Automated linting, testing, and security gates |
+
+---
+
 ## 🛠️ Quick Start & Local Setup
 
-### Prerequisites
-- **Java**: OpenJDK 21 LTS or compatible (Tested on OpenJDK 21 / 25)
+### Modern Prerequisites
+- **Java**: OpenJDK 21 LTS or compatible (Tested on OpenJDK 21)
 - **Node.js**: Node.js 20+ LTS & npm 10+
 - **Database**: PostgreSQL 15+ or Supabase instance (H2 in-memory profile supported for offline testing)
+- **Docker** *(Optional)*: Docker 24+ and Docker Compose v2+
 
 ### 1. Database Configuration
 By default, the backend connects to your PostgreSQL instance using `backend/src/main/resources/application.yml` or environment variables:
@@ -138,9 +155,9 @@ export APP_JWT_SECRET="404E635266556A586E3272357538782F413F4428472B4B62506453675
 cd backend
 ./mvnw clean spring-boot:run
 ```
-- API Base: `http://localhost:8080/api/v1`
+- API Base URL: `http://localhost:8080/api/v1`
 - Swagger UI / OpenAPI Docs: `http://localhost:8080/swagger-ui.html`
-- Health Endpoint: `http://localhost:8080/actuator/health`
+- Health Actuator: `http://localhost:8080/actuator/health`
 
 ### 3. Run Frontend Application
 ```bash
@@ -149,6 +166,24 @@ npm install
 npm run dev
 ```
 Open `http://localhost:3000` or `http://localhost:5173` in your browser.
+
+---
+
+## 🐳 Docker Orchestration
+
+The platform includes production-ready, multi-stage Dockerfiles and Docker Compose orchestration:
+
+```bash
+# Build and start all services (Backend, Frontend, and PostgreSQL)
+docker compose -f infrastructure/docker/docker-compose.yml up --build -d
+
+# Check service health and logs
+docker compose -f infrastructure/docker/docker-compose.yml ps
+docker compose -f infrastructure/docker/docker-compose.yml logs -f
+
+# Shut down the stack
+docker compose -f infrastructure/docker/docker-compose.yml down
+```
 
 ---
 
@@ -175,6 +210,15 @@ npm run build
 
 ---
 
+## 🔄 CI/CD Automation
+
+The repository utilizes automated GitHub Actions workflows under `.github/workflows/`:
+- **`ci.yml`**: Automated continuous integration running backend unit/integration tests, frontend tests, and production build checks on pushes and pull requests targeting `main` and `develop`.
+- **`staging-deployment.yml`**: Automated staging deployment workflow with explicit environment secret gates and post-deployment smoke testing.
+- **`production-release.yml`**: Hardened production release workflow enforcing commit policies, preventing unauthorized or legacy baseline releases, and gating releases behind manual approvals.
+
+---
+
 ## 📚 Comprehensive Architecture Documentation
 
 The complete architectural specifications are documented under `docs/architecture/`:
@@ -190,7 +234,7 @@ The complete architectural specifications are documented under `docs/architectur
 
 ## 🔑 Development Environment Seeding & Credentials
 
-In accordance with Milestone 2 security hardening, production migrations (`V3`) strictly purged hardcoded credentials. For local development and demonstration testing, use the development seeding profile:
+In accordance with security hardening, production migrations (`V3`) strictly purged hardcoded credentials. For local development and demonstration testing, use the development seeding profile:
 
 | Role | Email | Status |
 |---|---|---|
@@ -212,6 +256,87 @@ In accordance with Milestone 2 security hardening, production migrations (`V3`) 
 
 ---
 
+## 📜 Historical Architecture and Migration
+
+### Origins & Software Engineering Case Study
+The original Virtual Classroom application was designed as a university Software Engineering case study following Agile/Scrum methodology. The prototype explored digital lecture delivery, student/faculty registration approvals, and basic discussion forums.
+
+### Legacy Technology Stack
+
+| Layer | Technology (Legacy Prototype) |
+|---|---|
+| **Frontend** | HTML5, CSS3, Bootstrap 4, jQuery |
+| **Backend** | Java Server Pages (JSP), Java Servlets |
+| **Database** | MySQL (InnoDB) |
+| **Styling** | SCSS, Font Awesome, Themify Icons, Flaticon |
+| **Application Server** | Apache Tomcat |
+| **Build Tool** | Apache Maven |
+| **Version Control** | Git / Bitbucket |
+
+> [!NOTE]
+> **Historical Prerequisites Disclaimer:**
+>
+> The legacy prototype historically required **Java JDK 8+**, **Apache Tomcat 9+**, and **MySQL 8+**.
+>
+> **These technologies are NOT prerequisites for running the modern application.** The modern platform is entirely standalone, powered by **Java 21 LTS**, **Spring Boot 3.4**, and **PostgreSQL 15+**. Legacy SQL scripts and JSP prototypes have been archived in `database/legacy/` for historical reference and academic contrast.
+
+### Legacy Database Schema (`project`)
+The original MySQL prototype utilized 4 core tables:
+- `admin`: Administrator credentials (SHA1-hashed).
+- `student`: Student records with roll number, degree, course, year, and approval status.
+- `faculty`: Faculty records with subject, course, year, and approval status.
+- `enroll_for`: Valid degree-course combinations.
+
+*(Archived SQL script: `database/legacy/project_DB.sql`)*
+
+### Software Engineering Coursework Deliverables
+All original Software Engineering course deliverables are preserved under `se-artifacts/`:
+
+| Artifact | Location |
+|---|---|
+| Feasibility Report | `se-artifacts/feasibility-report/` |
+| Software Requirements Specification (SRS) | `se-artifacts/srs/` |
+| User Stories (Agile) | `se-artifacts/user-stories/` |
+| Scrum / Standup Notes | `se-artifacts/scrum-notes/` |
+| Test Cases | `se-artifacts/test-cases/` |
+| Reference Material & Links | `se-artifacts/material/` |
+
+### Historical SE Tooling & Quality Assurance
+- **JIRA** — Sprint planning and issue tracking
+- **Apache Maven** — Build automation
+- **JUnit & Selenium** — Functional and UI testing
+- **Cobertura & SonarQube** — Code quality and test coverage
+- **Coverity** — Static security analysis
+- **Jenkins** — Continuous integration
+- **Bitbucket** — Version control and code reviews
+
+### 📸 Legacy Prototype Screenshots
+
+| Home / Landing | Student Login | Student Dashboard |
+|---|---|---|
+| ![Home](screenshots/01_home_landing.png) | ![Login](screenshots/02_student_login.png) | ![Student Dashboard](screenshots/04_student_dashboard.png) |
+
+| Faculty Dashboard | Admin Dashboard | Q&A Forum |
+|---|---|---|
+| ![Faculty](screenshots/05_faculty_dashboard.png) | ![Admin](screenshots/06_admin_dashboard.png) | ![QnA](screenshots/07_qna_forum.png) |
+
+| Student Registration | Study Materials |
+|---|---|
+| ![Register](screenshots/03_student_register.png) | ![Materials](screenshots/08_study_materials.png) |
+
+---
+
+## 🤝 Contributing Guidelines
+
+1. **Branching Model**: All feature development branches must branch off `develop`. Direct pushes to `main` are restricted.
+2. **Commit Convention**: Follow Conventional Commits (e.g., `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`).
+3. **Pull Requests**: Submit PRs targeting `develop`. All CI pipeline tests and lint checks must pass prior to review.
+4. **Code Quality**: Ensure all new backend code includes unit tests (JUnit 5 / Mockito) and frontend code passes Vitest tests and TypeScript type checking.
+
+---
+
 ## 📄 License & Attribution
 
 This project is open-source under the MIT License. Developed as a modern Software Engineering architectural transformation.
+
+*Virtual Classroom — Empowering Education Through Technology*
