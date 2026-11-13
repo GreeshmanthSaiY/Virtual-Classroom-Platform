@@ -23,27 +23,95 @@ permissions:
   deployments: write
 
 jobs:
+  # ============================================================================
+  # 1. Production Release Safety Guard & Ancestry Gate
+  # ============================================================================
   production-guard:
-    name: Production Release Safety Guard
+    name: Production Release Safety Guard & Ancestry Gate
     runs-on: ubuntu-latest
     steps:
-      - name: Verify originating branch is protected main
+      - name: Checkout repository with full commit history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch origin main branch
+        run: |
+          echo "Fetching latest origin/main..."
+          git fetch origin main
+
+      - name: Verify release commit is reachable from approved origin/main
         env:
           GITHUB_REF: ${{ github.ref }}
+          GITHUB_SHA: ${{ github.sha }}
         run: |
-          echo "Target commit ref: $GITHUB_REF"
+          echo "================================================================"
+          echo "Production Release Ancestry Verification"
+          echo "Target Commit SHA: $GITHUB_SHA"
+          echo "Target Ref:        $GITHUB_REF"
+          echo "================================================================"
+
+          # 1. Verify ref format
           if [[ "$GITHUB_REF" != "refs/heads/main" && "$GITHUB_REF" != refs/tags/v* ]]; then
-            echo "::error ::Production releases may ONLY originate from main branch or versioned release tags."
+            echo "::error ::Production releases may ONLY originate from main branch or versioned release tags (refs/tags/v*)."
             exit 1
           fi
 
+          # 2. Strict ancestry check: commit must be reachable from origin/main
+          if git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "[PASS] Commit $GITHUB_SHA is confirmed reachable from origin/main."
+          else
+            echo "::error ::REJECTED: Commit $GITHUB_SHA is NOT reachable from origin/main!"
+            echo "Production releases may NOT originate from unmerged development branches (e.g. develop, update-local)."
+            echo "Merge changes into main via approved PR before creating a production release tag."
+            exit 1
+          fi
+
+      - name: Preflight check of required production secrets
+        env:
+          RENDER_HOOK: ${{ secrets.RENDER_PRODUCTION_DEPLOY_HOOK_URL }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID_PROD: ${{ secrets.VERCEL_PROJECT_ID_PROD }}
+          PROD_BACKEND: ${{ secrets.PRODUCTION_BACKEND_URL }}
+        run: |
+          echo "Verifying required production release secrets..."
+          MISSING_SECRETS=()
+
+          if [ -z "$RENDER_HOOK" ]; then
+            MISSING_SECRETS+=("RENDER_PRODUCTION_DEPLOY_HOOK_URL")
+          fi
+          if [ -z "$VERCEL_TOKEN" ]; then
+            MISSING_SECRETS+=("VERCEL_TOKEN")
+          fi
+          if [ -z "$VERCEL_PROJECT_ID_PROD" ]; then
+            MISSING_SECRETS+=("VERCEL_PROJECT_ID_PROD")
+          fi
+          if [ -z "$PROD_BACKEND" ]; then
+            MISSING_SECRETS+=("PRODUCTION_BACKEND_URL")
+          fi
+
+          if [ ${#MISSING_SECRETS[@]} -ne 0 ]; then
+            echo "::error ::Missing required production deployment secrets in GitHub Environment 'production':"
+            for s in "${MISSING_SECRETS[@]}"; do
+              echo "  - $s"
+            done
+            echo "Aborting production release before any deployment action. Configure production secrets in Repository Settings -> Environments -> production."
+            exit 1
+          fi
+          echo "All required production secrets are configured."
+
+  # ============================================================================
+  # 2. Production Deployment (Gated by production environment approval)
+  # ============================================================================
   deploy-production:
     name: Deploy to Production Environment
     needs: [production-guard]
     runs-on: ubuntu-latest
     environment:
       name: production
-      url: ${{ steps.deploy-frontend.outputs.prod_url || 'https://virtualclassroom.edu' }}
+      url: ${{ steps.deploy-frontend.outputs.prod_url }}
+    outputs:
+      prod_url: ${{ steps.deploy-frontend.outputs.prod_url }}
 
     steps:
       - name: Checkout repository
@@ -54,18 +122,12 @@ jobs:
         with:
           node-version: 20
 
-      # ------------------------------------------------------------------------
       # Step A: Deploy Backend to Render Production Web Service
-      # ------------------------------------------------------------------------
       - name: Deploy Backend to Render Production
         id: deploy-backend
         env:
           RENDER_HOOK_URL: ${{ secrets.RENDER_PRODUCTION_DEPLOY_HOOK_URL }}
         run: |
-          if [ -z "$RENDER_HOOK_URL" ]; then
-            echo "::error ::RENDER_PRODUCTION_DEPLOY_HOOK_URL is required for production release."
-            exit 1
-          fi
           echo "Triggering Render Production deploy hook..."
           HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$RENDER_HOOK_URL")
           if [ "$HTTP_STATUS" -eq 200 ] || [ "$HTTP_STATUS" -eq 201 ]; then
@@ -75,40 +137,79 @@ jobs:
             exit 1
           fi
 
-      # ------------------------------------------------------------------------
       # Step B: Deploy Frontend to Vercel Production
-      # ------------------------------------------------------------------------
       - name: Deploy Frontend to Vercel Production
         id: deploy-frontend
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_PROD }}
         run: |
-          if [ -z "$VERCEL_TOKEN" ] || [ -z "$VERCEL_PROJECT_ID" ]; then
-            echo "::error ::Vercel production secrets (VERCEL_TOKEN, VERCEL_PROJECT_ID_PROD) are required."
-            exit 1
-          fi
           echo "Installing Vercel CLI..."
           npm install -g vercel@latest
           cd frontend
+          echo "Pulling Vercel Production Environment Information..."
           vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+          echo "Building artifacts for production..."
           vercel build --prod --token="$VERCEL_TOKEN"
+          echo "Deploying prebuilt artifacts to Vercel Production..."
           PROD_URL=$(vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN")
+          if [ -z "$PROD_URL" ]; then
+            echo "::error ::Vercel deploy command returned empty production URL."
+            exit 1
+          fi
           echo "Production URL: $PROD_URL"
           echo "prod_url=$PROD_URL" >> $GITHUB_OUTPUT
 
-      # ------------------------------------------------------------------------
-      # Step C: Production Healthcheck
-      # ------------------------------------------------------------------------
-      - name: Production Smoke & Health Verification
+  # ============================================================================
+  # 3. Post-Deployment Production Live Smoke Tests (Separated Job)
+  # ============================================================================
+  production-smoke-tests:
+    name: Production Live Health & Contract Verification
+    needs: [production-guard, deploy-production]
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Validate production endpoint URLs
+        id: validate-urls
         env:
-          FRONTEND_URL: ${{ steps.deploy-frontend.outputs.prod_url || '' }}
-          BACKEND_URL: ${{ secrets.PRODUCTION_BACKEND_URL || '' }}
+          FRONTEND_URL: ${{ needs.deploy-production.outputs.prod_url || secrets.PRODUCTION_FRONTEND_URL }}
+          BACKEND_URL: ${{ secrets.PRODUCTION_BACKEND_URL }}
         run: |
-          echo "Verifying production health status..."
-          if [ -z "$BACKEND_URL" ]; then
-            echo "::warning ::PRODUCTION_BACKEND_URL is not set. Running smoke tests in dry-run mode."
-            node scripts/staging_smoke_tests.js --dry-run
-          else
-            node scripts/staging_smoke_tests.js --frontend="$FRONTEND_URL" --backend="$BACKEND_URL"
+          echo "Validating production endpoint URLs..."
+          if [ -z "$FRONTEND_URL" ]; then
+            echo "::error ::Production frontend URL is empty or unverified."
+            exit 1
           fi
+          if [ -z "$BACKEND_URL" ]; then
+            echo "::error ::PRODUCTION_BACKEND_URL secret is empty or unverified."
+            exit 1
+          fi
+          if [[ ! "$FRONTEND_URL" =~ ^https?:// ]]; then
+            echo "::error ::Invalid frontend URL format: $FRONTEND_URL"
+            exit 1
+          fi
+          if [[ ! "$BACKEND_URL" =~ ^https?:// ]]; then
+            echo "::error ::Invalid backend URL format: $BACKEND_URL"
+            exit 1
+          fi
+          echo "Target Frontend: $FRONTEND_URL"
+          echo "Target Backend:  $BACKEND_URL"
+          echo "frontend_url=$FRONTEND_URL" >> $GITHUB_OUTPUT
+          echo "backend_url=$BACKEND_URL" >> $GITHUB_OUTPUT
+
+      - name: Execute Live Production Smoke Tests
+        env:
+          FRONTEND_URL: ${{ steps.validate-urls.outputs.frontend_url }}
+          BACKEND_URL: ${{ steps.validate-urls.outputs.backend_url }}
+        run: |
+          echo "Verifying live production health and contract status..."
+          node scripts/staging_smoke_tests.js --frontend="$FRONTEND_URL" --backend="$BACKEND_URL"

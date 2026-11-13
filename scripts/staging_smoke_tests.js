@@ -17,17 +17,29 @@ let dryRun = false;
 
 for (let i = 0; i < args.length; i++) {
   if (args[i].startsWith('--frontend=')) {
-    frontendUrl = args[i].split('=')[1];
+    frontendUrl = args[i].substring(args[i].indexOf('=') + 1);
   } else if (args[i].startsWith('--backend=')) {
-    backendUrl = args[i].split('=')[1];
+    backendUrl = args[i].substring(args[i].indexOf('=') + 1);
   } else if (args[i] === '--dry-run') {
     dryRun = true;
   }
 }
 
 // Remove trailing slashes
-frontendUrl = frontendUrl.replace(/\/+$/, '');
-backendUrl = backendUrl.replace(/\/+$/, '');
+frontendUrl = (frontendUrl || '').trim().replace(/\/+$/, '');
+backendUrl = (backendUrl || '').trim().replace(/\/+$/, '');
+
+// URL format validation in live mode
+if (!dryRun) {
+  if (!/^https?:\/\//i.test(frontendUrl)) {
+    console.error(`ERROR: Target frontend URL must start with http:// or https://: "${frontendUrl}"`);
+    process.exit(1);
+  }
+  if (!/^https?:\/\//i.test(backendUrl)) {
+    console.error(`ERROR: Target backend URL must start with http:// or https://: "${backendUrl}"`);
+    process.exit(1);
+  }
+}
 
 console.log('================================================================');
 console.log('Virtual Classroom Platform - Staging Smoke Test Suite');
@@ -163,13 +175,22 @@ const tests = [
 async function runSuite() {
   let passedCount = 0;
   let failedCount = 0;
+  let skippedCount = 0;
 
   for (const test of tests) {
     process.stdout.write(`Testing: ${test.name.padEnd(65)} ... `);
     try {
       const result = await test.fn();
-      console.log(`[PASS] ${result.detail}`);
-      passedCount++;
+      if (result.skipped) {
+        console.log(`[SKIP] ${result.reason || 'Test skipped'}`);
+        skippedCount++;
+      } else if (dryRun) {
+        console.log(`[DRY-RUN SPEC VERIFIED] ${result.detail}`);
+        passedCount++;
+      } else {
+        console.log(`[PASS] ${result.detail}`);
+        passedCount++;
+      }
     } catch (err) {
       console.log(`[FAIL] ${err.message}`);
       failedCount++;
@@ -177,7 +198,10 @@ async function runSuite() {
   }
 
   console.log('\n----------------------------------------------------------------');
-  console.log(`Results: ${passedCount} passed, ${failedCount} failed (${tests.length} total)`);
+  console.log(`Results: ${passedCount} passed, ${failedCount} failed, ${skippedCount} skipped (${tests.length} total)`);
+  if (dryRun) {
+    console.log('NOTICE: Executed in DRY-RUN mode. No live HTTP network requests were dispatched.');
+  }
   console.log('================================================================');
 
   if (failedCount > 0) {
