@@ -12,5 +12,6 @@ export * from './ConfirmDialog';
 export * from './Badge';
 export * from './Tabs';
 export * from './Breadcrumbs';
+export * from './ThemeToggle';
 export * from '@/components/ui/LoadingSpinner';
 export * from '@/components/ui/Modal';
