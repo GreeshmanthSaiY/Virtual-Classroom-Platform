@@ -8,22 +8,27 @@ export const NotificationCenter: React.FC = () => {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const fetchNotifications = async () => {
-    try {
-      setLoading(true);
-      const data = await notificationService.getNotifications();
-      setNotifications(data || []);
-    } catch {
-      // Suppress background poll errors
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
+    let isMounted = true;
+
+    const fetchNotifications = async () => {
+      try {
+        if (isMounted) setLoading(true);
+        const data = await notificationService.getNotifications();
+        if (isMounted) setNotifications(data || []);
+      } catch {
+        // Suppress background poll errors
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
     fetchNotifications();
     const interval = setInterval(fetchNotifications, 60000); // 1 minute background poll
-    return () => clearInterval(interval);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, []);
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
