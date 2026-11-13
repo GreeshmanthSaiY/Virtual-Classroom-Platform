@@ -1,0 +1,122 @@
+# ==============================================================================
+# Virtual Classroom Platform - Unified Docker Compose Orchestration
+# ==============================================================================
+
+services:
+  # ----------------------------------------------------------------------------
+  # Backend API Service (Spring Boot 3.4.x / Java 21)
+  # ----------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: virtual-classroom-backend:latest
+    container_name: virtual-classroom-backend
+    restart: unless-stopped
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    environment:
+      SERVER_PORT: 8080
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-docker}
+      # Database Configuration: Defaults to Supabase / External PostgreSQL
+      DATABASE_URL: ${DATABASE_URL:-jdbc:postgresql://db:5432/${POSTGRES_DB:-virtual_classroom}}
+      DATABASE_USERNAME: ${DATABASE_USERNAME:-${POSTGRES_USER:-postgres}}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-${POSTGRES_PASSWORD:-postgrespassword}}
+      # Spring Datasource Fallbacks
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-${DATABASE_URL:-jdbc:postgresql://db:5432/${POSTGRES_DB:-virtual_classroom}}}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-${DATABASE_USERNAME:-${POSTGRES_USER:-postgres}}}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-${DATABASE_PASSWORD:-${POSTGRES_PASSWORD:-postgrespassword}}}
+      # Security & JWT Configuration
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-86400000}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
+      # File Storage Configuration
+      STORAGE_PROVIDER: ${STORAGE_PROVIDER:-local}
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
+      SUPABASE_STORAGE_BUCKET: ${SUPABASE_STORAGE_BUCKET:-academic-assets}
+      STORAGE_LOCAL_DIR: /app/uploads
+    volumes:
+      - backend_uploads:/app/uploads
+    networks:
+      - virtual-classroom-net
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+
+  # ----------------------------------------------------------------------------
+  # Frontend Web Client (React 18 / Vite / Nginx)
+  # ----------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api/v1}
+        VITE_APP_NAME: ${VITE_APP_NAME:-Virtual Classroom}
+        VITE_ENABLE_DEMO_CREDENTIALS: ${VITE_ENABLE_DEMO_CREDENTIALS:-false}
+    image: virtual-classroom-frontend:latest
+    container_name: virtual-classroom-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - virtual-classroom-net
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ----------------------------------------------------------------------------
+  # Optional Local PostgreSQL Database (Selectable Development Profile Only)
+  # Activated via: docker compose --profile local-db up
+  # Note: Intended production database is Supabase PostgreSQL.
+  # ----------------------------------------------------------------------------
+  db:
+    image: postgres:16-alpine
+    container_name: virtual-classroom-local-db
+    profiles:
+      - local-db
+    restart: unless-stopped
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-virtual_classroom}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgrespassword}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - virtual-classroom-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-virtual_classroom}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+# ------------------------------------------------------------------------------
+# Isolated Bridge Network
+# ------------------------------------------------------------------------------
+networks:
+  virtual-classroom-net:
+    name: virtual-classroom-network
+    driver: bridge
+
+# ------------------------------------------------------------------------------
+# Persistent Volumes
+# ------------------------------------------------------------------------------
+volumes:
+  pgdata:
+    name: virtual-classroom-pgdata
+  backend_uploads:
+    name: virtual-classroom-backend-uploads
