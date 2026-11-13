@@ -9,6 +9,7 @@ on:
       - '**.md'
       - 'docs/**'
       - '.gitignore'
+  workflow_dispatch:
 
 concurrency:
   group: pr-val-${{ github.event.pull_request.number || github.ref }}

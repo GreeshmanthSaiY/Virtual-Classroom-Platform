@@ -8,6 +8,14 @@ on:
       - '**.md'
       - 'docs/**'
       - '.gitignore'
+  pull_request:
+    branches:
+      - develop
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+  workflow_dispatch:
 
 concurrency:
   group: int-val-${{ github.ref }}
@@ -79,10 +87,38 @@ jobs:
             -Dflyway.test.password=postgrespassword
           ./mvnw clean package -DskipTests
 
+      - name: Install PostgreSQL client utilities
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Validate Flyway schema history & integrity via direct PSQL
+        env:
+          PGPASSWORD: postgrespassword
+        run: |
+          echo "--- Checking applied Flyway schema history ---"
+          psql -h localhost -U postgres -d testdb -c "SELECT installed_rank, version, description, type, success FROM flyway_schema_history ORDER BY installed_rank;"
+
+          echo "--- Verifying zero demo users remain in migrated database ---"
+          DEMO_COUNT=$(psql -h localhost -U postgres -d testdb -t -c "SELECT COUNT(*) FROM users WHERE email IN ('admin@virtualclassroom.edu', 'dr.jeevan@virtualclassroom.edu', 'gaurav.shukla@virtualclassroom.edu');" | xargs)
+          if [ "$DEMO_COUNT" -ne "0" ]; then
+            echo "ERROR: Demo users detected in migrated database! Count: $DEMO_COUNT"
+            exit 1
+          fi
+          echo "Demo user count: 0 (Purge verified)"
+
+          echo "--- Verifying foreign key relationships and schema constraints ---"
+          psql -h localhost -U postgres -d testdb -c "
+            SELECT conname, contype, conrelid::regclass AS table_from, confrelid::regclass AS table_to
+            FROM pg_constraint
+            WHERE contype IN ('f', 'u') AND connamespace = 'public'::regnamespace
+            ORDER BY table_from, conname;
+          "
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Validate Docker Compose specification
+        env:
+          JWT_SECRET: "ci_docker_compose_config_secret_minimum_256_bits_length"
         run: docker compose config
 
       - name: Build Docker artifacts
