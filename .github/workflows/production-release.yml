@@ -1,0 +1,99 @@
+name: Production Release
+
+# ==============================================================================
+# Production Release Pipeline - Gated by Protected Main Branch & Manual Approval
+# ==============================================================================
+on:
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: 'Release version tag (e.g., v1.0.0)'
+        required: true
+        type: string
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  deployments: write
+
+jobs:
+  production-guard:
+    name: Production Release Safety Guard
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify originating branch is protected main
+        run: |
+          echo "Target commit ref: ${{ github.ref }}"
+          if [[ "${{ github.ref }}" != "refs/heads/main" && "${{ github.ref }}" != refs/tags/v* ]]; then
+            echo "::error ::Production releases may ONLY originate from main branch or versioned release tags."
+            exit 1
+          fi
+
+  deploy-production:
+    name: Deploy to Production Environment
+    needs: [production-guard]
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ steps.deploy-frontend.outputs.prod_url || 'https://virtualclassroom.edu' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # ------------------------------------------------------------------------
+      # Step A: Deploy Backend to Render Production Web Service
+      # ------------------------------------------------------------------------
+      - name: Deploy Backend to Render Production
+        id: deploy-backend
+        run: |
+          if [ -z "${{ secrets.RENDER_PRODUCTION_DEPLOY_HOOK_URL }}" ]; then
+            echo "::error ::RENDER_PRODUCTION_DEPLOY_HOOK_URL is required for production release."
+            exit 1
+          fi
+          echo "Triggering Render Production deploy hook..."
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${{ secrets.RENDER_PRODUCTION_DEPLOY_HOOK_URL }}")
+          if [ "$HTTP_STATUS" -eq 200 ] || [ "$HTTP_STATUS" -eq 201 ]; then
+            echo "Render production deploy hook succeeded (HTTP $HTTP_STATUS)."
+          else
+            echo "::error ::Render production deploy hook failed with status $HTTP_STATUS."
+            exit 1
+          fi
+
+      # ------------------------------------------------------------------------
+      # Step B: Deploy Frontend to Vercel Production
+      # ------------------------------------------------------------------------
+      - name: Deploy Frontend to Vercel Production
+        id: deploy-frontend
+        run: |
+          if [ -z "${{ secrets.VERCEL_TOKEN }}" ] || [ -z "${{ secrets.VERCEL_PROJECT_ID_PROD }}" ]; then
+            echo "::error ::Vercel production secrets (VERCEL_TOKEN, VERCEL_PROJECT_ID_PROD) are required."
+            exit 1
+          fi
+          echo "Installing Vercel CLI..."
+          npm install -g vercel@latest
+          cd frontend
+          vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+          vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+          PROD_URL=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
+          echo "Production URL: $PROD_URL"
+          echo "prod_url=$PROD_URL" >> $GITHUB_OUTPUT
+
+      # ------------------------------------------------------------------------
+      # Step C: Production Healthcheck
+      # ------------------------------------------------------------------------
+      - name: Production Smoke & Health Verification
+        run: |
+          echo "Verifying production health status..."
+          node scripts/staging_smoke_tests.js --frontend="${{ steps.deploy-frontend.outputs.prod_url }}" --backend="${{ secrets.PRODUCTION_BACKEND_URL }}"

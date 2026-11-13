@@ -2,8 +2,10 @@ package com.virtualclassroom;
 
 import io.zonky.test.db.postgres.embedded.EmbeddedPostgres;
 import org.flywaydb.core.Flyway;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.postgresql.ds.PGSimpleDataSource;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -14,11 +16,61 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class FlywayMigrationSafetyTest {
 
+    private interface DisposableDb extends AutoCloseable {
+        DataSource getDataSource();
+        @Override
+        default void close() throws Exception {}
+    }
+
+    private DisposableDb createDisposableDb() throws Exception {
+        String extUrl = System.getProperty("flyway.test.jdbc-url", System.getenv("POSTGRES_TEST_URL"));
+        if (extUrl != null && !extUrl.isBlank()) {
+            String user = System.getProperty("flyway.test.user", System.getenv().getOrDefault("POSTGRES_TEST_USER", "postgres"));
+            String pass = System.getProperty("flyway.test.password", System.getenv().getOrDefault("POSTGRES_TEST_PASSWORD", "postgres"));
+
+            PGSimpleDataSource ds = new PGSimpleDataSource();
+            ds.setUrl(extUrl);
+            ds.setUser(user);
+            ds.setPassword(pass);
+
+            try (Connection conn = ds.getConnection(); Statement stmt = conn.createStatement()) {
+                stmt.execute("DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;");
+            }
+
+            return new DisposableDb() {
+                @Override
+                public DataSource getDataSource() {
+                    return ds;
+                }
+            };
+        }
+
+        try {
+            EmbeddedPostgres pg = EmbeddedPostgres.start();
+            DataSource ds = pg.getDatabase("postgres", "postgres");
+            return new DisposableDb() {
+                @Override
+                public DataSource getDataSource() {
+                    return ds;
+                }
+                @Override
+                public void close() throws Exception {
+                    pg.close();
+                }
+            };
+        } catch (Exception e) {
+            if (e.getMessage() != null && (e.getMessage().contains("error=623") || e.getMessage().contains("initdb.exe") || e.getMessage().contains("Cannot run program"))) {
+                Assumptions.abort("Host environment restricts executing embedded postgres binaries: " + e.getMessage());
+            }
+            throw e;
+        }
+    }
+
     @Test
     @DisplayName("Scenario A: Fresh disposable PostgreSQL with V1, V2, V3, V4 and V5 executes cleanly without demo users")
     void scenarioA_FreshPostgresDatabase_AppliesAllMigrationsCleanly() throws Exception {
-        try (EmbeddedPostgres pg = EmbeddedPostgres.start()) {
-            DataSource dataSource = pg.getDatabase("postgres", "postgres");
+        try (DisposableDb db = createDisposableDb()) {
+            DataSource dataSource = db.getDataSource();
 
             Flyway flyway = Flyway.configure()
                     .dataSource(dataSource)
@@ -110,8 +162,8 @@ class FlywayMigrationSafetyTest {
     @Test
     @DisplayName("Scenario B: Existing PostgreSQL database with V1-V3 applied, followed by V4 & V5 upgrade preserves data and backfills")
     void scenarioB_ExistingPostgresWithLegitimateData_PreservedAfterV4() throws Exception {
-        try (EmbeddedPostgres pg = EmbeddedPostgres.start()) {
-            DataSource dataSource = pg.getDatabase("postgres", "postgres");
+        try (DisposableDb db = createDisposableDb()) {
+            DataSource dataSource = db.getDataSource();
 
             // Step 1: Migrate up to V3 only
             Flyway flywayV3 = Flyway.configure()

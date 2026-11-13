@@ -1,0 +1,81 @@
+# ==============================================================================
+# Render Blueprint Specification - Unified Multi-Environment Backend Services
+# ==============================================================================
+services:
+  # Staging Backend Service
+  - type: web
+    name: virtual-classroom-backend-staging
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    region: oregon
+    plan: starter
+    branch: develop
+    healthCheckPath: /actuator/health/liveness
+    autoDeploy: false
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: staging
+      - key: PORT
+        value: 8080
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_USERNAME
+        value: postgres
+      - key: DATABASE_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_EXPIRATION_MS
+        value: 86400000
+      - key: COOKIE_SECURE
+        value: true
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://virtual-classroom-staging.vercel.app,http://localhost:5173
+      - key: STORAGE_PROVIDER
+        value: supabase
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: academic-assets-staging
+
+  # Production Backend Service
+  - type: web
+    name: virtual-classroom-backend-prod
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    region: oregon
+    plan: starter
+    branch: main
+    healthCheckPath: /actuator/health/liveness
+    autoDeploy: false
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: PORT
+        value: 8080
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_USERNAME
+        value: postgres
+      - key: DATABASE_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_EXPIRATION_MS
+        value: 86400000
+      - key: COOKIE_SECURE
+        value: true
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false # e.g. https://virtual-classroom.vercel.app
+      - key: STORAGE_PROVIDER
+        value: supabase
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: academic-assets-prod

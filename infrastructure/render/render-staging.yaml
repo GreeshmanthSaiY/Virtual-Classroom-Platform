@@ -1,0 +1,41 @@
+# ==============================================================================
+# Render Blueprint Specification - Staging Backend Service
+# ==============================================================================
+services:
+  - type: web
+    name: virtual-classroom-backend-staging
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    region: oregon
+    plan: starter
+    branch: develop
+    healthCheckPath: /actuator/health/liveness
+    autoDeploy: false
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: staging
+      - key: PORT
+        value: 8080
+      - key: DATABASE_URL
+        sync: false # Set via Render Dashboard: jdbc:postgresql://<staging-db>.supabase.co:5432/postgres?sslmode=require
+      - key: DATABASE_USERNAME
+        value: postgres
+      - key: DATABASE_PASSWORD
+        sync: false # Staging Supabase database password
+      - key: JWT_SECRET
+        sync: false # Secure 256-bit secret key for staging
+      - key: JWT_EXPIRATION_MS
+        value: 86400000
+      - key: COOKIE_SECURE
+        value: true
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://virtual-classroom-staging.vercel.app,http://localhost:5173
+      - key: STORAGE_PROVIDER
+        value: supabase
+      - key: SUPABASE_URL
+        sync: false # https://<staging-supabase-id>.supabase.co
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: academic-assets-staging

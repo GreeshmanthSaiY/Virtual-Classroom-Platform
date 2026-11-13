@@ -1,0 +1,106 @@
+name: Staging Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      skip_smoke_tests:
+        description: 'Skip post-deployment automated smoke tests'
+        required: false
+        default: 'false'
+        type: boolean
+  push:
+    branches:
+      - develop
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  deployments: write
+
+jobs:
+  # ============================================================================
+  # 1. Staging Deployment Gate & Delivery
+  # ============================================================================
+  deploy-staging:
+    name: Deploy to Staging Environment (Render & Vercel)
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: ${{ steps.deploy-frontend.outputs.vercel_url || 'https://staging.virtualclassroom.edu' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # ------------------------------------------------------------------------
+      # Step A: Trigger Backend Staging Deployment on Render
+      # ------------------------------------------------------------------------
+      - name: Deploy Backend Service to Render Staging
+        id: deploy-backend
+        run: |
+          if [ -z "${{ secrets.RENDER_STAGING_DEPLOY_HOOK_URL }}" ]; then
+            echo "::warning ::RENDER_STAGING_DEPLOY_HOOK_URL is not configured in GitHub Secrets. Skipping Render API trigger."
+            echo "backend_status=SKIPPED_MISSING_SECRET" >> $GITHUB_OUTPUT
+          else
+            echo "Triggering Render staging deployment hook..."
+            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${{ secrets.RENDER_STAGING_DEPLOY_HOOK_URL }}")
+            if [ "$HTTP_STATUS" -eq 200 ] || [ "$HTTP_STATUS" -eq 201 ]; then
+              echo "Render staging deployment triggered successfully (HTTP $HTTP_STATUS)."
+              echo "backend_status=TRIGGERED" >> $GITHUB_OUTPUT
+            else
+              echo "::error ::Render staging deployment hook failed with HTTP $HTTP_STATUS."
+              exit 1
+            fi
+          fi
+
+      # ------------------------------------------------------------------------
+      # Step B: Build & Deploy Frontend Staging on Vercel
+      # ------------------------------------------------------------------------
+      - name: Deploy Frontend to Vercel Staging
+        id: deploy-frontend
+        run: |
+          if [ -z "${{ secrets.VERCEL_TOKEN }}" ] || [ -z "${{ secrets.VERCEL_ORG_ID }}" ] || [ -z "${{ secrets.VERCEL_PROJECT_ID }}" ]; then
+            echo "::warning ::Vercel credentials (VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID) are not configured. Skipping Vercel deploy."
+            echo "vercel_url=https://staging.virtualclassroom.edu" >> $GITHUB_OUTPUT
+          else
+            echo "Installing Vercel CLI..."
+            npm install -g vercel@latest
+            cd frontend
+            echo "Pulling Vercel Staging Environment Information..."
+            vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+            echo "Building artifacts for staging preview..."
+            vercel build --token=${{ secrets.VERCEL_TOKEN }}
+            echo "Deploying prebuilt artifacts to Vercel Staging..."
+            DEPLOY_URL=$(vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }})
+            echo "Vercel staging URL: $DEPLOY_URL"
+            echo "vercel_url=$DEPLOY_URL" >> $GITHUB_OUTPUT
+          fi
+
+      # ------------------------------------------------------------------------
+      # Step C: Automated Staging Post-Deployment Smoke Tests
+      # ------------------------------------------------------------------------
+      - name: Run Staging Smoke Tests
+        if: ${{ inputs.skip_smoke_tests != true }}
+        env:
+          FRONTEND_URL: ${{ steps.deploy-frontend.outputs.vercel_url || secrets.STAGING_FRONTEND_URL || 'http://localhost:3000' }}
+          BACKEND_URL: ${{ secrets.STAGING_BACKEND_URL || 'http://localhost:8080' }}
+        run: |
+          if [ -z "${{ secrets.STAGING_BACKEND_URL }}" ]; then
+            echo "::warning ::STAGING_BACKEND_URL secret is not set. Smoke tests will run in dry-run verification mode."
+            node scripts/staging_smoke_tests.js --dry-run
+          else
+            echo "Executing live smoke tests against staging endpoints..."
+            node scripts/staging_smoke_tests.js --frontend="$FRONTEND_URL" --backend="$BACKEND_URL"
+          fi
