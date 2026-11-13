@@ -1,18 +1,32 @@
 name: Production Release
 
 # ==============================================================================
-# Production Release Pipeline - Gated by Protected Main Branch & Manual Approval
+# Production Release Pipeline - Gated by Approved Main History & Manual Approval
 # ==============================================================================
 on:
   workflow_dispatch:
     inputs:
       release_version:
-        description: 'Release version tag (e.g., v1.0.0)'
+        description: 'Release version tag matching SemVer (e.g. v1.0.0 or v1.0.0-rollback.1)'
         required: true
+        type: string
+      is_rollback:
+        description: 'Set to true ONLY if intentionally rolling back to a previous approved release commit'
+        required: false
+        default: false
+        type: boolean
+      rollback_target_commit:
+        description: 'If rollback: the exact commit SHA on main to deploy (e.g. 11d5f95)'
+        required: false
+        type: string
+      rollback_reason:
+        description: 'If rollback: mandatory auditable justification (minimum 20 characters)'
+        required: false
         type: string
   push:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-*'
 
 concurrency:
   group: deploy-production
@@ -24,11 +38,16 @@ permissions:
 
 jobs:
   # ============================================================================
-  # 1. Production Release Safety Guard & Ancestry Gate
+  # 1. Production Release Safety Guard & Approved Policy Gate
   # ============================================================================
   production-guard:
-    name: Production Release Safety Guard & Ancestry Gate
+    name: Production Release Policy & Ancestry Gate
     runs-on: ubuntu-latest
+    outputs:
+      target_commit: ${{ steps.verify-policy.outputs.target_commit }}
+      release_type: ${{ steps.verify-policy.outputs.release_type }}
+      release_version: ${{ steps.verify-policy.outputs.release_version }}
+
     steps:
       - name: Checkout repository with full commit history
         uses: actions/checkout@v4
@@ -40,32 +59,126 @@ jobs:
           echo "Fetching latest origin/main..."
           git fetch origin main
 
-      - name: Verify release commit is reachable from approved origin/main
+      - name: Verify release commit satisfies approved production release policy
+        id: verify-policy
         env:
           GITHUB_REF: ${{ github.ref }}
           GITHUB_SHA: ${{ github.sha }}
+          INPUT_RELEASE_VERSION: ${{ inputs.release_version }}
+          INPUT_IS_ROLLBACK: ${{ inputs.is_rollback }}
+          INPUT_ROLLBACK_TARGET_COMMIT: ${{ inputs.rollback_target_commit }}
+          INPUT_ROLLBACK_REASON: ${{ inputs.rollback_reason }}
         run: |
-          echo "================================================================"
-          echo "Production Release Ancestry Verification"
-          echo "Target Commit SHA: $GITHUB_SHA"
-          echo "Target Ref:        $GITHUB_REF"
-          echo "================================================================"
+          RAW_REF="${GITHUB_REF}"
+          RAW_SHA="${GITHUB_SHA}"
+          TAG_NAME="${GITHUB_REF#refs/tags/}"
+          INPUT_VERSION="${INPUT_RELEASE_VERSION}"
+          IS_ROLLBACK="${INPUT_IS_ROLLBACK:-false}"
+          ROLLBACK_COMMIT="${INPUT_ROLLBACK_TARGET_COMMIT:-}"
+          ROLLBACK_REASON="${INPUT_ROLLBACK_REASON:-}"
 
-          # 1. Verify ref format
-          if [[ "$GITHUB_REF" != "refs/heads/main" && "$GITHUB_REF" != refs/tags/v* ]]; then
-            echo "::error ::Production releases may ONLY originate from main branch or versioned release tags (refs/tags/v*)."
-            exit 1
-          fi
+          LEGACY_BASELINE="ef9b13c9264ea4f364672993a548597342ed5e9e"
 
-          # 2. Strict ancestry check: commit must be reachable from origin/main
-          if git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
-            echo "[PASS] Commit $GITHUB_SHA is confirmed reachable from origin/main."
+          # Determine target version string
+          if [[ "$RAW_REF" == refs/tags/* ]]; then
+            VERSION="$TAG_NAME"
           else
-            echo "::error ::REJECTED: Commit $GITHUB_SHA is NOT reachable from origin/main!"
-            echo "Production releases may NOT originate from unmerged development branches (e.g. develop, update-local)."
-            echo "Merge changes into main via approved PR before creating a production release tag."
+            VERSION="$INPUT_VERSION"
+          fi
+
+          echo "================================================================"
+          echo "Production Release Policy Verification"
+          echo "Target Ref:     $RAW_REF"
+          echo "Target Commit:  $RAW_SHA"
+          echo "Target Version: $VERSION"
+          echo "Is Rollback:    $IS_ROLLBACK"
+          echo "================================================================"
+
+          # --------------------------------------------------------------------
+          # 1. Validate Version Tag Format (Strict SemVer)
+          # --------------------------------------------------------------------
+          SEMVER_REGEX='^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'
+          if [[ ! "$VERSION" =~ $SEMVER_REGEX ]]; then
+            echo "::error ::Invalid release version '$VERSION'. Releases must strictly follow SemVer (e.g. v1.0.0, v1.0.1, v1.0.0-rollback.1)."
             exit 1
           fi
+          echo "[PASS] Valid SemVer format: $VERSION"
+
+          # --------------------------------------------------------------------
+          # 2. Determine Effective Commit to Release
+          # --------------------------------------------------------------------
+          if [ "$IS_ROLLBACK" = "true" ]; then
+            RELEASE_TYPE="ROLLBACK"
+
+            if [ -z "$ROLLBACK_COMMIT" ]; then
+              echo "::error ::Rollback release requested, but 'rollback_target_commit' was not provided."
+              exit 1
+            fi
+
+            if [ -z "$ROLLBACK_REASON" ] || [ ${#ROLLBACK_REASON} -lt 20 ]; then
+              echo "::error ::Rollback release requires an auditable 'rollback_reason' of at least 20 characters."
+              exit 1
+            fi
+
+            if ! TARGET_COMMIT=$(git rev-parse --verify "${ROLLBACK_COMMIT}^{commit}" 2>/dev/null); then
+              echo "::error ::Invalid rollback commit reference '${ROLLBACK_COMMIT}'."
+              exit 1
+            fi
+
+            echo "[ROLLBACK MODE] Target Rollback Commit: $TARGET_COMMIT"
+            echo "[ROLLBACK MODE] Justification: $ROLLBACK_REASON"
+          else
+            RELEASE_TYPE="NORMAL"
+            TARGET_COMMIT="$RAW_SHA"
+          fi
+
+          # --------------------------------------------------------------------
+          # 3. Strict Ancestry & Reachability Check against origin/main
+          # --------------------------------------------------------------------
+          if ! git merge-base --is-ancestor "$TARGET_COMMIT" origin/main; then
+            echo "::error ::REJECTED: Commit $TARGET_COMMIT is NOT reachable from origin/main!"
+            echo "Releases may NOT originate from unmerged development branches (e.g. develop, update-local)."
+            echo "Changes must be reviewed, approved, and merged into main before creating a production release."
+            exit 1
+          fi
+          echo "[PASS] Commit $TARGET_COMMIT is confirmed reachable from origin/main."
+
+          # --------------------------------------------------------------------
+          # 4. Reject Historical Legacy Baseline (ef9b13c and prior commits)
+          # --------------------------------------------------------------------
+          if [ "$TARGET_COMMIT" = "$LEGACY_BASELINE" ] || git merge-base --is-ancestor "$TARGET_COMMIT" "$LEGACY_BASELINE"; then
+            echo "::error ::REJECTED: Commit $TARGET_COMMIT is the legacy pre-milestone baseline ($LEGACY_BASELINE) or older."
+            echo "Legacy prototype code cannot be deployed to production under any circumstances."
+            exit 1
+          fi
+          echo "[PASS] Commit $TARGET_COMMIT is distinct from and newer than legacy baseline $LEGACY_BASELINE."
+
+          # --------------------------------------------------------------------
+          # 5. Approved Release Policy Enforcement: Normal vs Rollback
+          # --------------------------------------------------------------------
+          MAIN_HEAD=$(git rev-parse origin/main)
+
+          if [ "$RELEASE_TYPE" = "NORMAL" ]; then
+            if [ "$TARGET_COMMIT" != "$MAIN_HEAD" ]; then
+              echo "::error ::REJECTED: Commit $TARGET_COMMIT is an historical commit on main, not the current HEAD ($MAIN_HEAD)."
+              echo "Normal production releases must always point to the approved current HEAD of origin/main."
+              echo "If you intend to rollback to an earlier approved commit, use workflow_dispatch with is_rollback=true, rollback_target_commit, and rollback_reason."
+              exit 1
+            fi
+            echo "[PASS] Approved Normal Release: Commit matches current HEAD of origin/main ($MAIN_HEAD)."
+          else
+            if [ "$TARGET_COMMIT" = "$MAIN_HEAD" ]; then
+              echo "::warning ::Rollback was requested, but specified commit is already the current HEAD of origin/main."
+            fi
+            echo "[PASS] Approved Rollback Release: Commit $TARGET_COMMIT approved with audit trail."
+          fi
+
+          # --------------------------------------------------------------------
+          # 6. Set Outputs for Subsequent Jobs
+          # --------------------------------------------------------------------
+          echo "target_commit=$TARGET_COMMIT" >> $GITHUB_OUTPUT
+          echo "release_type=$RELEASE_TYPE" >> $GITHUB_OUTPUT
+          echo "release_version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Preflight check of required production secrets
         env:
@@ -114,8 +227,10 @@ jobs:
       prod_url: ${{ steps.deploy-frontend.outputs.prod_url }}
 
     steps:
-      - name: Checkout repository
+      - name: Checkout repository at verified release commit
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.production-guard.outputs.target_commit }}
 
       - name: Set up Node.js 20.x
         uses: actions/setup-node@v4
@@ -170,8 +285,10 @@ jobs:
     environment:
       name: production
     steps:
-      - name: Checkout repository
+      - name: Checkout repository at verified release commit
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.production-guard.outputs.target_commit }}
 
       - name: Set up Node.js 20.x
         uses: actions/setup-node@v4
