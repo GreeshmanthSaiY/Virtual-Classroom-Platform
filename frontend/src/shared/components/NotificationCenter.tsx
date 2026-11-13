@@ -127,6 +127,7 @@ export const NotificationCenter: React.FC = () => {
                         onClick={() => handleMarkAsRead(item.id)}
                         className="p-1 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded transition-colors"
                         title="Mark as read"
+                        aria-label="Mark as read"
                       >
                         <Check className="w-3.5 h-3.5" />
                       </button>

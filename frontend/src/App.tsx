@@ -119,6 +119,7 @@ export const App: React.FC = () => {
                   <Route path="/materials" element={<CourseMaterialsPage />} />
                   <Route path="/lectures" element={<VideoLecturesPage />} />
                   <Route path="/forum" element={<QnAForumPage />} />
+                  <Route path="/discussions" element={<Navigate to="/forum" replace />} />
                 </Route>
 
                 {/* Administrator Console Protected Routes */}
