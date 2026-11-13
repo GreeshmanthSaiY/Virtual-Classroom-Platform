@@ -1,0 +1,217 @@
+name: Pull Request Validation
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+  workflow_dispatch:
+
+concurrency:
+  group: pr-val-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ============================================================================
+  # 1. Frontend Quality Gate (React 18 / TypeScript / Vite / Vitest)
+  # ============================================================================
+  frontend-validation:
+    name: Frontend QA (TypeScript, Vitest, Build, Audit)
+    runs-on: ubuntu-latest
+    if: hashFiles('frontend/package.json') != ''
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies from lockfile
+        run: npm ci
+
+      - name: TypeScript type-check and production build
+        run: npm run build
+
+      - name: Run Vitest unit & contract test suite
+        run: npm test -- --run
+
+      - name: Run npm security audit
+        run: npm audit --audit-level=high
+
+  # ============================================================================
+  # 2. Backend Quality Gate (Spring Boot 3.4.x / Java 21 / Maven)
+  # ============================================================================
+  backend-validation:
+    name: Backend QA (JUnit 5, Mockito, Spring Security, Package)
+    runs-on: ubuntu-latest
+    if: hashFiles('backend/pom.xml') != ''
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Grant execute permission to Maven wrapper
+        run: chmod +x mvnw
+
+      - name: Run Backend Unit & Integration Tests
+        run: ./mvnw clean test -Dspring.profiles.active=test
+
+      - name: Build production JAR package
+        run: ./mvnw clean package -DskipTests
+
+      - name: Verify JAR artifact existence and size
+        run: |
+          JAR_FILE=$(ls target/virtual-classroom-backend-*.jar 2>/dev/null | grep -v 'original' | head -n 1)
+          if [ -z "$JAR_FILE" ]; then
+            echo "ERROR: Production JAR was not generated in target/"
+            exit 1
+          fi
+          echo "Verified JAR package: $JAR_FILE ($(stat -c%s "$JAR_FILE") bytes)"
+
+  # ============================================================================
+  # 3. PostgreSQL Migration & Schema Validation (PostgreSQL 16 Container)
+  # ============================================================================
+  postgres-migration-validation:
+    name: PostgreSQL 16 Migration & Integrity Gate
+    runs-on: ubuntu-latest
+    if: hashFiles('backend/pom.xml') != ''
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: testdb
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgrespassword
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Grant execute permission to Maven wrapper
+        run: chmod +x mvnw
+
+      - name: Install PostgreSQL client utilities
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Execute Flyway Migration Safety Test against real PostgreSQL 16
+        env:
+          POSTGRES_TEST_URL: jdbc:postgresql://localhost:5432/testdb
+          POSTGRES_TEST_USER: postgres
+          POSTGRES_TEST_PASSWORD: postgrespassword
+        run: >
+          ./mvnw test -Dtest=FlywayMigrationSafetyTest
+          -Dflyway.test.jdbc-url=jdbc:postgresql://localhost:5432/testdb
+          -Dflyway.test.user=postgres
+          -Dflyway.test.password=postgrespassword
+
+      - name: Validate schema constraints and zero demo users via direct PSQL
+        env:
+          PGPASSWORD: postgrespassword
+        run: |
+          echo "--- Checking applied Flyway schema history ---"
+          psql -h localhost -U postgres -d testdb -c "SELECT installed_rank, version, description, type, success FROM flyway_schema_history ORDER BY installed_rank;"
+          
+          echo "--- Verifying zero demo users remain ---"
+          DEMO_COUNT=$(psql -h localhost -U postgres -d testdb -t -c "SELECT COUNT(*) FROM users WHERE email IN ('admin@virtualclassroom.edu', 'dr.jeevan@virtualclassroom.edu', 'gaurav.shukla@virtualclassroom.edu');" | xargs)
+          if [ "$DEMO_COUNT" -ne "0" ]; then
+            echo "ERROR: Demo users detected in migrated database! Count: $DEMO_COUNT"
+            exit 1
+          fi
+          echo "Demo user count: 0 (Purge verified)"
+
+          echo "--- Verifying foreign key relationships and index integrity ---"
+          psql -h localhost -U postgres -d testdb -c "
+            SELECT conname, contype, conrelid::regclass AS table_from, confrelid::regclass AS table_to
+            FROM pg_constraint
+            WHERE contype IN ('f', 'u') AND connamespace = 'public'::regnamespace
+            ORDER BY table_from, conname;
+          "
+
+  # ============================================================================
+  # 4. Docker Build & Multi-Container Smoke Gate
+  # ============================================================================
+  docker-validation:
+    name: Docker Image Build & Compose Orchestration
+    runs-on: ubuntu-latest
+    if: hashFiles('docker-compose.yml') != ''
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Validate Docker Compose specification
+        run: docker compose config
+
+      - name: Build Backend Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: false
+          tags: virtual-classroom-backend:ci
+          load: true
+
+      - name: Build Frontend Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: false
+          tags: virtual-classroom-frontend:ci
+          load: true
+
+      - name: Test Docker Compose Startup & Healthchecks
+        env:
+          JWT_SECRET: "ci_docker_smoke_test_secret_key_minimum_256_bits_for_hmac_sha256_verification"
+          SPRING_PROFILES_ACTIVE: "test"
+          SPRING_DATASOURCE_URL: "jdbc:h2:mem:testdb;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH"
+          SPRING_DATASOURCE_USERNAME: "sa"
+          SPRING_DATASOURCE_PASSWORD: ""
+          STORAGE_PROVIDER: "local"
+        run: |
+          docker compose up -d
+          echo "Waiting for services to report healthy..."
+          timeout 90 bash -c 'until docker compose ps | grep -q "(healthy)"; do sleep 3; done'
+          docker compose ps
+          docker compose down
