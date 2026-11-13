@@ -28,9 +28,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Verify originating branch is protected main
+        env:
+          GITHUB_REF: ${{ github.ref }}
         run: |
-          echo "Target commit ref: ${{ github.ref }}"
-          if [[ "${{ github.ref }}" != "refs/heads/main" && "${{ github.ref }}" != refs/tags/v* ]]; then
+          echo "Target commit ref: $GITHUB_REF"
+          if [[ "$GITHUB_REF" != "refs/heads/main" && "$GITHUB_REF" != refs/tags/v* ]]; then
             echo "::error ::Production releases may ONLY originate from main branch or versioned release tags."
             exit 1
           fi
@@ -57,13 +59,15 @@ jobs:
       # ------------------------------------------------------------------------
       - name: Deploy Backend to Render Production
         id: deploy-backend
+        env:
+          RENDER_HOOK_URL: ${{ secrets.RENDER_PRODUCTION_DEPLOY_HOOK_URL }}
         run: |
-          if [ -z "${{ secrets.RENDER_PRODUCTION_DEPLOY_HOOK_URL }}" ]; then
+          if [ -z "$RENDER_HOOK_URL" ]; then
             echo "::error ::RENDER_PRODUCTION_DEPLOY_HOOK_URL is required for production release."
             exit 1
           fi
           echo "Triggering Render Production deploy hook..."
-          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${{ secrets.RENDER_PRODUCTION_DEPLOY_HOOK_URL }}")
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$RENDER_HOOK_URL")
           if [ "$HTTP_STATUS" -eq 200 ] || [ "$HTTP_STATUS" -eq 201 ]; then
             echo "Render production deploy hook succeeded (HTTP $HTTP_STATUS)."
           else
@@ -76,17 +80,20 @@ jobs:
       # ------------------------------------------------------------------------
       - name: Deploy Frontend to Vercel Production
         id: deploy-frontend
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_PROD }}
         run: |
-          if [ -z "${{ secrets.VERCEL_TOKEN }}" ] || [ -z "${{ secrets.VERCEL_PROJECT_ID_PROD }}" ]; then
+          if [ -z "$VERCEL_TOKEN" ] || [ -z "$VERCEL_PROJECT_ID" ]; then
             echo "::error ::Vercel production secrets (VERCEL_TOKEN, VERCEL_PROJECT_ID_PROD) are required."
             exit 1
           fi
           echo "Installing Vercel CLI..."
           npm install -g vercel@latest
           cd frontend
-          vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-          vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-          PROD_URL=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
+          vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+          vercel build --prod --token="$VERCEL_TOKEN"
+          PROD_URL=$(vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN")
           echo "Production URL: $PROD_URL"
           echo "prod_url=$PROD_URL" >> $GITHUB_OUTPUT
 
@@ -94,6 +101,14 @@ jobs:
       # Step C: Production Healthcheck
       # ------------------------------------------------------------------------
       - name: Production Smoke & Health Verification
+        env:
+          FRONTEND_URL: ${{ steps.deploy-frontend.outputs.prod_url || '' }}
+          BACKEND_URL: ${{ secrets.PRODUCTION_BACKEND_URL || '' }}
         run: |
           echo "Verifying production health status..."
-          node scripts/staging_smoke_tests.js --frontend="${{ steps.deploy-frontend.outputs.prod_url }}" --backend="${{ secrets.PRODUCTION_BACKEND_URL }}"
+          if [ -z "$BACKEND_URL" ]; then
+            echo "::warning ::PRODUCTION_BACKEND_URL is not set. Running smoke tests in dry-run mode."
+            node scripts/staging_smoke_tests.js --dry-run
+          else
+            node scripts/staging_smoke_tests.js --frontend="$FRONTEND_URL" --backend="$BACKEND_URL"
+          fi

@@ -16,7 +16,6 @@ concurrency:
 
 permissions:
   contents: read
-  pull-requests: write
 
 jobs:
   # ============================================================================
@@ -201,6 +200,9 @@ jobs:
         env:
           JWT_SECRET: "ci_docker_smoke_test_secret_key_minimum_256_bits_for_hmac_sha256_verification"
           SPRING_PROFILES_ACTIVE: "test"
+          SPRING_DATASOURCE_URL: "jdbc:h2:mem:testdb;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH"
+          SPRING_DATASOURCE_USERNAME: "sa"
+          SPRING_DATASOURCE_PASSWORD: ""
           STORAGE_PROVIDER: "local"
         run: |
           docker compose up -d
