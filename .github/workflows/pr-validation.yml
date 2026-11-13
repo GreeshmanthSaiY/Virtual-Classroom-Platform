@@ -25,6 +25,7 @@ jobs:
   frontend-validation:
     name: Frontend QA (TypeScript, Vitest, Build, Audit)
     runs-on: ubuntu-latest
+    if: hashFiles('frontend/package.json') != ''
     defaults:
       run:
         working-directory: frontend
@@ -57,6 +58,7 @@ jobs:
   backend-validation:
     name: Backend QA (JUnit 5, Mockito, Spring Security, Package)
     runs-on: ubuntu-latest
+    if: hashFiles('backend/pom.xml') != ''
     defaults:
       run:
         working-directory: backend
@@ -95,6 +97,7 @@ jobs:
   postgres-migration-validation:
     name: PostgreSQL 16 Migration & Integrity Gate
     runs-on: ubuntu-latest
+    if: hashFiles('backend/pom.xml') != ''
     services:
       postgres:
         image: postgres:16-alpine
@@ -169,6 +172,7 @@ jobs:
   docker-validation:
     name: Docker Image Build & Compose Orchestration
     runs-on: ubuntu-latest
+    if: hashFiles('docker-compose.yml') != ''
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
