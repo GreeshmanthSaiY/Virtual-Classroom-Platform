@@ -328,6 +328,8 @@ jobs:
               docker compose --profile local-db logs backend --tail=150 || true
               echo "=== Diagnostic: Frontend Container Logs ==="
               docker compose --profile local-db logs frontend --tail=50 || true
+              echo "=== Diagnostic: Frontend Health Details ==="
+              docker inspect --format='{{range .State.Health.Log}}{{.ExitCode}}: {{.Output}}{{end}}' virtual-classroom-frontend || true
             fi
             echo "=== Cleaning up Docker Compose resources ==="
             docker compose --profile local-db down -v --remove-orphans || true
@@ -354,7 +356,7 @@ jobs:
           echo "=== 6. Probing Service Health Endpoints ==="
           docker compose --profile local-db exec -T backend wget -qO- http://localhost:8080/actuator/health
           echo ""
-          docker compose --profile local-db exec -T frontend wget -qO- http://localhost:80/healthz
+          docker compose --profile local-db exec -T frontend wget -qO- http://127.0.0.1:80/healthz
           echo ""
           echo "Docker Compose smoke test completed successfully."
 
