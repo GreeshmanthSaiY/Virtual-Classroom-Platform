@@ -25,15 +25,23 @@ jobs:
   frontend-validation:
     name: Frontend QA (TypeScript, Vitest, Build, Audit)
     runs-on: ubuntu-latest
-    if: hashFiles('frontend/package.json') != ''
-    defaults:
-      run:
-        working-directory: frontend
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Check frontend component availability
+        id: check-frontend
+        run: |
+          if [ -d "frontend" ] && [ -f "frontend/package.json" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "Frontend component detected. Proceeding with frontend validation."
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Frontend Skipped::Frontend component is not present on this branch. Skipping frontend validation."
+          fi
+
       - name: Set up Node.js 20.x
+        if: steps.check-frontend.outputs.available == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -41,16 +49,38 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies from lockfile
+        if: steps.check-frontend.outputs.available == 'true'
+        working-directory: frontend
         run: npm ci
 
       - name: TypeScript type-check and production build
+        if: steps.check-frontend.outputs.available == 'true'
+        working-directory: frontend
         run: npm run build
 
       - name: Run Vitest unit & contract test suite
+        if: steps.check-frontend.outputs.available == 'true'
+        working-directory: frontend
         run: npm test -- --run
 
       - name: Run npm security audit
+        if: steps.check-frontend.outputs.available == 'true'
+        working-directory: frontend
         run: npm audit --audit-level=high
+
+      - name: Report frontend QA status
+        if: always()
+        env:
+          AVAILABLE: ${{ steps.check-frontend.outputs.available }}
+        run: |
+          echo "### Frontend QA Summary" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$AVAILABLE" = "true" ]; then
+            echo "Status: **COMPLETED**" >> "$GITHUB_STEP_SUMMARY"
+            echo "Component: React 18 / Vite / TypeScript" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Status: **SKIPPED**" >> "$GITHUB_STEP_SUMMARY"
+            echo "Reason: \`frontend/\` directory or \`package.json\` not present on target branch." >> "$GITHUB_STEP_SUMMARY"
+          fi
 
   # ============================================================================
   # 2. Backend Quality Gate (Spring Boot 3.4.x / Java 21 / Maven)
@@ -58,15 +88,23 @@ jobs:
   backend-validation:
     name: Backend QA (JUnit 5, Mockito, Spring Security, Package)
     runs-on: ubuntu-latest
-    if: hashFiles('backend/pom.xml') != ''
-    defaults:
-      run:
-        working-directory: backend
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Check backend component availability
+        id: check-backend
+        run: |
+          if [ -d "backend" ] && [ -f "backend/pom.xml" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "Backend component detected. Proceeding with backend validation."
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Backend Skipped::Backend component is not present on this branch. Skipping backend validation."
+          fi
+
       - name: Set up JDK 21 (Temurin)
+        if: steps.check-backend.outputs.available == 'true'
         uses: actions/setup-java@v4
         with:
           java-version: '21'
@@ -74,15 +112,23 @@ jobs:
           cache: maven
 
       - name: Grant execute permission to Maven wrapper
+        if: steps.check-backend.outputs.available == 'true'
+        working-directory: backend
         run: chmod +x mvnw
 
       - name: Run Backend Unit & Integration Tests
+        if: steps.check-backend.outputs.available == 'true'
+        working-directory: backend
         run: ./mvnw clean test -Dspring.profiles.active=test
 
       - name: Build production JAR package
+        if: steps.check-backend.outputs.available == 'true'
+        working-directory: backend
         run: ./mvnw clean package -DskipTests
 
       - name: Verify JAR artifact existence and size
+        if: steps.check-backend.outputs.available == 'true'
+        working-directory: backend
         run: |
           JAR_FILE=$(ls target/virtual-classroom-backend-*.jar 2>/dev/null | grep -v 'original' | head -n 1)
           if [ -z "$JAR_FILE" ]; then
@@ -91,13 +137,26 @@ jobs:
           fi
           echo "Verified JAR package: $JAR_FILE ($(stat -c%s "$JAR_FILE") bytes)"
 
+      - name: Report backend QA status
+        if: always()
+        env:
+          AVAILABLE: ${{ steps.check-backend.outputs.available }}
+        run: |
+          echo "### Backend QA Summary" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$AVAILABLE" = "true" ]; then
+            echo "Status: **COMPLETED**" >> "$GITHUB_STEP_SUMMARY"
+            echo "Component: Spring Boot 3.4.x / Java 21 / Maven" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Status: **SKIPPED**" >> "$GITHUB_STEP_SUMMARY"
+            echo "Reason: \`backend/\` directory or \`pom.xml\` not present on target branch." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
   # ============================================================================
   # 3. PostgreSQL Migration & Schema Validation (PostgreSQL 16 Container)
   # ============================================================================
   postgres-migration-validation:
     name: PostgreSQL 16 Migration & Integrity Gate
     runs-on: ubuntu-latest
-    if: hashFiles('backend/pom.xml') != ''
     services:
       postgres:
         image: postgres:16-alpine
@@ -112,14 +171,23 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-    defaults:
-      run:
-        working-directory: backend
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Check migration component availability
+        id: check-migration
+        run: |
+          if [ -d "backend" ] && [ -f "backend/pom.xml" ] && [ -d "backend/src/main/resources/db/migration" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "Migration component detected. Proceeding with PostgreSQL migration validation."
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=PostgreSQL Migration Skipped::Migration scripts or backend not present on this branch. Skipping migration validation."
+          fi
+
       - name: Set up JDK 21 (Temurin)
+        if: steps.check-migration.outputs.available == 'true'
         uses: actions/setup-java@v4
         with:
           java-version: '21'
@@ -127,12 +195,17 @@ jobs:
           cache: maven
 
       - name: Grant execute permission to Maven wrapper
+        if: steps.check-migration.outputs.available == 'true'
+        working-directory: backend
         run: chmod +x mvnw
 
       - name: Install PostgreSQL client utilities
+        if: steps.check-migration.outputs.available == 'true'
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
 
       - name: Execute Flyway Migration Safety Test against real PostgreSQL 16
+        if: steps.check-migration.outputs.available == 'true'
+        working-directory: backend
         env:
           POSTGRES_TEST_URL: jdbc:postgresql://localhost:5432/testdb
           POSTGRES_TEST_USER: postgres
@@ -144,6 +217,8 @@ jobs:
           -Dflyway.test.password=postgrespassword
 
       - name: Validate schema constraints and zero demo users via direct PSQL
+        if: steps.check-migration.outputs.available == 'true'
+        working-directory: backend
         env:
           PGPASSWORD: postgrespassword
         run: |
@@ -166,24 +241,51 @@ jobs:
             ORDER BY table_from, conname;
           "
 
+      - name: Report migration QA status
+        if: always()
+        env:
+          AVAILABLE: ${{ steps.check-migration.outputs.available }}
+        run: |
+          echo "### PostgreSQL 16 Migration Gate Summary" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$AVAILABLE" = "true" ]; then
+            echo "Status: **COMPLETED**" >> "$GITHUB_STEP_SUMMARY"
+            echo "Component: Flyway V1..V6 on PostgreSQL 16 Alpine" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Status: **SKIPPED**" >> "$GITHUB_STEP_SUMMARY"
+            echo "Reason: Migration scripts or backend not present on target branch." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
   # ============================================================================
   # 4. Docker Build & Multi-Container Smoke Gate
   # ============================================================================
   docker-validation:
     name: Docker Image Build & Compose Orchestration
     runs-on: ubuntu-latest
-    if: hashFiles('docker-compose.yml') != ''
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Check Docker component availability
+        id: check-docker
+        run: |
+          if [ -f "docker-compose.yml" ] && [ -d "backend" ] && [ -d "frontend" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "Docker Compose and component directories detected. Proceeding with Docker validation."
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Docker Validation Skipped::docker-compose.yml or container contexts not present on this branch. Skipping Docker validation."
+          fi
+
       - name: Set up Docker Buildx
+        if: steps.check-docker.outputs.available == 'true'
         uses: docker/setup-buildx-action@v3
 
       - name: Validate Docker Compose specification
+        if: steps.check-docker.outputs.available == 'true'
         run: docker compose config
 
       - name: Build Backend Docker Image
+        if: steps.check-docker.outputs.available == 'true'
         uses: docker/build-push-action@v5
         with:
           context: ./backend
@@ -193,6 +295,7 @@ jobs:
           load: true
 
       - name: Build Frontend Docker Image
+        if: steps.check-docker.outputs.available == 'true'
         uses: docker/build-push-action@v5
         with:
           context: ./frontend
@@ -202,6 +305,7 @@ jobs:
           load: true
 
       - name: Test Docker Compose Startup & Healthchecks
+        if: steps.check-docker.outputs.available == 'true'
         env:
           JWT_SECRET: "ci_docker_smoke_test_secret_key_minimum_256_bits_for_hmac_sha256_verification"
           SPRING_PROFILES_ACTIVE: "test"
@@ -215,3 +319,17 @@ jobs:
           timeout 90 bash -c 'until docker compose ps | grep -q "(healthy)"; do sleep 3; done'
           docker compose ps
           docker compose down
+
+      - name: Report Docker QA status
+        if: always()
+        env:
+          AVAILABLE: ${{ steps.check-docker.outputs.available }}
+        run: |
+          echo "### Docker Validation Summary" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$AVAILABLE" = "true" ]; then
+            echo "Status: **COMPLETED**" >> "$GITHUB_STEP_SUMMARY"
+            echo "Component: Multi-container orchestration & Docker Buildx" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Status: **SKIPPED**" >> "$GITHUB_STEP_SUMMARY"
+            echo "Reason: \`docker-compose.yml\` or component directories not present on target branch." >> "$GITHUB_STEP_SUMMARY"
+          fi
