@@ -22,18 +22,40 @@ public class AuthController {
 
     private final AuthService authService;
     private final boolean cookieSecure;
+    private final String cookieSameSite;
 
     @org.springframework.beans.factory.annotation.Autowired
     public AuthController(
             AuthService authService,
-            @org.springframework.beans.factory.annotation.Value("${app.security.cookie-secure:false}") boolean cookieSecure
+            @org.springframework.beans.factory.annotation.Value("${app.security.cookie-secure:false}") boolean cookieSecure,
+            @org.springframework.beans.factory.annotation.Value("${app.security.cookie-same-site:}") String cookieSameSite
     ) {
         this.authService = authService;
         this.cookieSecure = cookieSecure;
+        if (cookieSameSite != null && !cookieSameSite.isBlank()) {
+            this.cookieSameSite = cookieSameSite.trim();
+        } else {
+            // Environment-aware default:
+            // When HTTPS is active (cookieSecure=true), default to "None" to support cross-site deployment (e.g. Vercel + Render).
+            // When HTTP is active (cookieSecure=false), default to "Lax" since browsers reject SameSite=None without Secure.
+            this.cookieSameSite = cookieSecure ? "None" : "Lax";
+        }
+    }
+
+    public AuthController(AuthService authService, boolean cookieSecure) {
+        this(authService, cookieSecure, cookieSecure ? "None" : "Lax");
     }
 
     public AuthController(AuthService authService) {
-        this(authService, false);
+        this(authService, false, "Lax");
+    }
+
+    public boolean isCookieSecure() {
+        return cookieSecure;
+    }
+
+    public String getCookieSameSite() {
+        return cookieSameSite;
     }
 
     @PostMapping("/login")
@@ -172,7 +194,7 @@ public class AuthController {
                 .secure(cookieSecure)
                 .path("/api/v1/auth")
                 .maxAge(7 * 24 * 60 * 60)
-                .sameSite("Strict")
+                .sameSite(cookieSameSite)
                 .build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
@@ -183,7 +205,7 @@ public class AuthController {
                 .secure(cookieSecure)
                 .path("/api/v1/auth")
                 .maxAge(0)
-                .sameSite("Strict")
+                .sameSite(cookieSameSite)
                 .build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }

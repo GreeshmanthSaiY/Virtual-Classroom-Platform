@@ -178,7 +178,7 @@ class BackendSecurityAuditTest {
         when(mockAuth.login(any(), any())).thenReturn(rawAuthResponse);
 
         com.virtualclassroom.controller.AuthController controller =
-                new com.virtualclassroom.controller.AuthController(mockAuth, true);
+                new com.virtualclassroom.controller.AuthController(mockAuth, true, "Strict");
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         MockHttpServletResponse response = new MockHttpServletResponse();
