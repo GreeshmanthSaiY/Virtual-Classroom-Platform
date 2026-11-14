@@ -307,7 +307,7 @@ jobs:
       - name: Test Docker Compose Startup & Healthchecks
         if: steps.check-docker.outputs.available == 'true'
         env:
-          JWT_SECRET: "ci_docker_smoke_test_secret_key_minimum_256_bits_for_hmac_sha256_verification"
+          JWT_SECRET: "Y2ktZG9ja2VyLXNtb2tlLXRlc3Qtc2VjcmV0LWtleS0zMmJ5dGVzIQ=="
           SPRING_PROFILES_ACTIVE: "docker"
           DATABASE_URL: "jdbc:postgresql://db:5432/virtual_classroom"
           DATABASE_USERNAME: "postgres"
