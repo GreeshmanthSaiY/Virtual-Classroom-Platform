@@ -30,6 +30,7 @@ app:
     expiration-ms: ${JWT_EXPIRATION_MS:86400000} # 24 hours
   security:
     cookie-secure: ${COOKIE_SECURE:false}
+    cookie-same-site: ${COOKIE_SAME_SITE:Lax}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
   storage:
