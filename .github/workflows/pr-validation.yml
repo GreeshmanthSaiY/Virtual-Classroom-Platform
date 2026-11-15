@@ -152,14 +152,14 @@ jobs:
           fi
 
   # ============================================================================
-  # 3. PostgreSQL Migration & Schema Validation (PostgreSQL 16 Container)
+  # 3. PostgreSQL Migration & Schema Validation (PostgreSQL 17 Container)
   # ============================================================================
   postgres-migration-validation:
-    name: PostgreSQL 16 Migration & Integrity Gate
+    name: PostgreSQL 17 Migration & Standalone Runner Gate
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:17-alpine
         env:
           POSTGRES_DB: testdb
           POSTGRES_USER: postgres
@@ -203,7 +203,7 @@ jobs:
         if: steps.check-migration.outputs.available == 'true'
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
 
-      - name: Execute Flyway Migration Safety Test against real PostgreSQL 16
+      - name: Execute Flyway Migration Safety Test and Standalone Runner Tests against PostgreSQL 17
         if: steps.check-migration.outputs.available == 'true'
         working-directory: backend
         env:
@@ -211,10 +211,22 @@ jobs:
           POSTGRES_TEST_USER: postgres
           POSTGRES_TEST_PASSWORD: postgrespassword
         run: >
-          ./mvnw test -Dtest=FlywayMigrationSafetyTest
+          ./mvnw test -Dtest=FlywayMigrationSafetyTest,StandaloneFlywayMigrationRunnerTest
           -Dflyway.test.jdbc-url=jdbc:postgresql://localhost:5432/testdb
           -Dflyway.test.user=postgres
           -Dflyway.test.password=postgrespassword
+
+      - name: Test Standalone Flyway Runner CLI invocation via exec-maven-plugin
+        if: steps.check-migration.outputs.available == 'true'
+        working-directory: backend
+        run: |
+          echo "Verifying Standalone Runner fails closed when required environment variables are absent..."
+          if ./mvnw exec:java; then
+            echo "ERROR: Runner should have failed when environment variables are missing!"
+            exit 1
+          else
+            echo "SUCCESS: Standalone Runner correctly failed-closed on missing configuration (Exit code non-zero)."
+          fi
 
       - name: Validate schema constraints and zero demo users via direct PSQL
         if: steps.check-migration.outputs.available == 'true'
@@ -222,6 +234,12 @@ jobs:
         env:
           PGPASSWORD: postgrespassword
         run: |
+          echo "Ensuring clean migrated state for psql schema validation..."
+          ./mvnw test -Dtest=StandaloneFlywayMigrationRunnerTest#testSuccessfulMigrationAgainstIsolatedDatabase \
+            -Dflyway.test.jdbc-url=jdbc:postgresql://localhost:5432/testdb \
+            -Dflyway.test.user=postgres \
+            -Dflyway.test.password=postgrespassword
+
           echo "--- Checking applied Flyway schema history ---"
           psql -h localhost -U postgres -d testdb -c "SELECT installed_rank, version, description, type, success FROM flyway_schema_history ORDER BY installed_rank;"
           

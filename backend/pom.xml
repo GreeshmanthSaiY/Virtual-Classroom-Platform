@@ -136,6 +136,14 @@
                     <argLine>-javaagent:"${user.home}/.m2/repository/net/bytebuddy/byte-buddy-agent/1.15.11/byte-buddy-agent-1.15.11.jar" -XX:+EnableDynamicAgentLoading -Dnet.bytebuddy.experimental=true</argLine>
                 </configuration>
             </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.5.0</version>
+                <configuration>
+                    <mainClass>com.virtualclassroom.migration.StandaloneFlywayMigrationRunner</mainClass>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
 </project>
