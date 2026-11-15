@@ -126,7 +126,13 @@ jobs:
       - name: Run Backend Unit & Integration Tests
         if: steps.check-backend.outputs.available == 'true'
         working-directory: backend
-        run: ./mvnw clean test -Dspring.profiles.active=test
+        run: ./mvnw clean test -Dspring.profiles.active=test -Dtest='*Test,!FlywayMigrationSafetyTest,!StandaloneFlywayMigrationRunnerTest'
+
+      - name: Dump Surefire Reports on Failure (Backend)
+        if: failure()
+        run: |
+          echo "=== Dumping Surefire Failure Reports ==="
+          cat backend/target/surefire-reports/*.txt || true
 
       - name: Build production JAR package
         if: steps.check-backend.outputs.available == 'true'
@@ -214,14 +220,20 @@ jobs:
         if: steps.check-migration.outputs.available == 'true'
         working-directory: backend
         env:
-          POSTGRES_TEST_URL: jdbc:postgresql://localhost:5432/testdb
+          POSTGRES_TEST_URL: jdbc:postgresql://127.0.0.1:5432/testdb
           POSTGRES_TEST_USER: postgres
           POSTGRES_TEST_PASSWORD: postgrespassword
-        run: >
-          ./mvnw test -Dtest=FlywayMigrationSafetyTest,StandaloneFlywayMigrationRunnerTest
-          -Dflyway.test.jdbc-url=jdbc:postgresql://localhost:5432/testdb
-          -Dflyway.test.user=postgres
-          -Dflyway.test.password=postgrespassword
+        run: |
+          ./mvnw test -Dtest=FlywayMigrationSafetyTest,StandaloneFlywayMigrationRunnerTest \
+            -Dflyway.test.jdbc-url=jdbc:postgresql://127.0.0.1:5432/testdb \
+            -Dflyway.test.user=postgres \
+            -Dflyway.test.password=postgrespassword
+
+      - name: Dump Surefire Reports on Failure (PostgreSQL Gate)
+        if: failure()
+        run: |
+          echo "=== Dumping Surefire Failure Reports ==="
+          cat backend/target/surefire-reports/*.txt || true
 
       - name: Test Standalone Flyway Runner CLI invocation via exec-maven-plugin
         if: steps.check-migration.outputs.available == 'true'
@@ -243,15 +255,15 @@ jobs:
         run: |
           echo "Ensuring clean migrated state for psql schema validation..."
           ./mvnw test -Dtest=StandaloneFlywayMigrationRunnerTest#testSuccessfulMigrationAgainstIsolatedDatabase \
-            -Dflyway.test.jdbc-url=jdbc:postgresql://localhost:5432/testdb \
+            -Dflyway.test.jdbc-url=jdbc:postgresql://127.0.0.1:5432/testdb \
             -Dflyway.test.user=postgres \
             -Dflyway.test.password=postgrespassword
 
           echo "--- Checking applied Flyway schema history ---"
-          psql -h localhost -U postgres -d testdb -c "SELECT installed_rank, version, description, type, success FROM flyway_schema_history ORDER BY installed_rank;"
+          psql -h 127.0.0.1 -U postgres -d testdb -c "SELECT installed_rank, version, description, type, success FROM flyway_schema_history ORDER BY installed_rank;"
           
           echo "--- Verifying zero demo users remain ---"
-          DEMO_COUNT=$(psql -h localhost -U postgres -d testdb -t -c "SELECT COUNT(*) FROM users WHERE email IN ('admin@virtualclassroom.edu', 'dr.jeevan@virtualclassroom.edu', 'gaurav.shukla@virtualclassroom.edu');" | xargs)
+          DEMO_COUNT=$(psql -h 127.0.0.1 -U postgres -d testdb -t -c "SELECT COUNT(*) FROM users WHERE email IN ('admin@virtualclassroom.edu', 'dr.jeevan@virtualclassroom.edu', 'gaurav.shukla@virtualclassroom.edu');" | xargs)
           if [ "$DEMO_COUNT" -ne "0" ]; then
             echo "ERROR: Demo users detected in migrated database! Count: $DEMO_COUNT"
             exit 1
@@ -259,7 +271,7 @@ jobs:
           echo "Demo user count: 0 (Purge verified)"
 
           echo "--- Verifying foreign key relationships and index integrity ---"
-          psql -h localhost -U postgres -d testdb -c "
+          psql -h 127.0.0.1 -U postgres -d testdb -c "
             SELECT conname, contype, conrelid::regclass AS table_from, confrelid::regclass AS table_to
             FROM pg_constraint
             WHERE contype IN ('f', 'u') AND connamespace = 'public'::regnamespace
