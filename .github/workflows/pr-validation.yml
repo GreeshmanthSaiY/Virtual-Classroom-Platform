@@ -1,6 +1,13 @@
 name: Pull Request Validation
 
 on:
+  push:
+    branches:
+      - feature/staging-readiness-config
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
   pull_request:
     branches:
       - develop
