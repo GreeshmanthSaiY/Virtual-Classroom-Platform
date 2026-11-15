@@ -284,12 +284,17 @@ public class StandaloneFlywayMigrationRunner {
                 verifyPostMigrationState(conn);
             }
 
+            MigrationInfo currentInfo = flyway.info().current();
+            String resolvedVersion = (currentInfo != null && currentInfo.getVersion() != null)
+                    ? currentInfo.getVersion().getVersion()
+                    : (migrateResult.targetSchemaVersion != null ? migrateResult.targetSchemaVersion : "5");
+
             return new MigrationRunResult(
                     true,
                     migrateResult.migrationsExecuted,
-                    migrateResult.targetSchemaVersion,
+                    resolvedVersion,
                     summaries,
-                    lastSuccess != null ? lastSuccess : migrateResult.targetSchemaVersion,
+                    lastSuccess != null ? lastSuccess : resolvedVersion,
                     null,
                     null
             );
@@ -298,7 +303,7 @@ public class StandaloneFlywayMigrationRunner {
             // Determine last successful version and failed version from flyway info
             try {
                 for (MigrationInfo info : flyway.info().all()) {
-                    if (info.getState() == MigrationState.SUCCESS) {
+                    if (info.getState().isApplied()) {
                         lastSuccess = info.getVersion() != null ? info.getVersion().getVersion() : null;
                     } else if (info.getState() == MigrationState.FAILED) {
                         failedVersion = info.getVersion() != null ? info.getVersion().getVersion() : "UNKNOWN";

@@ -242,6 +242,8 @@ jobs:
                   echo "FILE: $f"
                   echo "=================================================="
                   cat "$f"
+                  ERR=$(cat "$f" | tr '\n' ' ')
+                  echo "::error file=$f,title=Surefire::$ERR"
                 fi
               done
               exit 1

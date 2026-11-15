@@ -366,6 +366,8 @@ class StandaloneFlywayMigrationRunnerTest {
                             .applySetting("hibernate.connection.datasource", ds)
                             .applySetting("hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect")
                             .applySetting("hibernate.hbm2ddl.auto", "validate")
+                            .applySetting("hibernate.physical_naming_strategy", "org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy")
+                            .applySetting("hibernate.implicit_naming_strategy", "org.springframework.boot.orm.jpa.hibernate.SpringImplicitNamingStrategy")
                             .build();
 
             try {
