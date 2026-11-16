@@ -468,7 +468,7 @@ public class StandaloneFlywayMigrationRunner {
                 "SELECT last_value FROM pg_sequences WHERE schemaname = 'public' AND sequencename = '" + sequenceName + "'")) {
             if (rs.next()) {
                 long lastVal = rs.getLong("last_value");
-                if (lastVal != 1) {
+                if (lastVal > 1) {
                     throw new IllegalStateException("Sequence '" + sequenceName + "' is not cleanly reset to 1. Current: " + lastVal);
                 }
             }
