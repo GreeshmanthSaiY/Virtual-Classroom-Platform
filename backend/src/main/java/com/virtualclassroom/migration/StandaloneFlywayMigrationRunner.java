@@ -7,6 +7,10 @@ import org.flywaydb.core.api.output.MigrateOutput;
 import org.flywaydb.core.api.output.MigrateResult;
 
 import javax.sql.DataSource;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -85,9 +89,15 @@ public class StandaloneFlywayMigrationRunner {
         System.out.println("================================================================================");
 
         try {
-            String url = System.getenv("DATABASE_URL");
-            String username = System.getenv("DATABASE_USERNAME");
-            String password = System.getenv("DATABASE_PASSWORD");
+            String url = resolveEnvVar("DATABASE_URL");
+            if (url == null || url.trim().isEmpty()) {
+                url = "jdbc:postgresql://" + EXPECTED_STAGING_HOST + ":" + EXPECTED_PORT + "/" + EXPECTED_DATABASE + "?sslmode=require";
+            }
+            String username = resolveEnvVar("DATABASE_USERNAME");
+            if (username == null || username.trim().isEmpty()) {
+                username = EXPECTED_STAGING_TENANT_USER;
+            }
+            String password = resolveEnvVar("DATABASE_PASSWORD");
 
             MigrationRunResult result = runForStaging(url, username, password);
 
@@ -110,6 +120,46 @@ public class StandaloneFlywayMigrationRunner {
             e.printStackTrace(System.err);
             System.exit(1);
         }
+    }
+
+    /**
+     * Resolves an environment variable from System.getenv or a local .env file.
+     * Never prints or logs resolved secret values.
+     */
+    public static String resolveEnvVar(String key) {
+        String val = System.getenv(key);
+        if (val != null && !val.trim().isEmpty()) {
+            return val.trim();
+        }
+        List<Path> candidates = List.of(
+                Paths.get(".env"),
+                Paths.get("../.env"),
+                Paths.get("backend/.env")
+        );
+        for (Path p : candidates) {
+            if (Files.exists(p)) {
+                try {
+                    for (String line : Files.readAllLines(p, StandardCharsets.UTF_8)) {
+                        line = line.trim();
+                        if (line.startsWith("#") || !line.contains("=")) {
+                            continue;
+                        }
+                        int eq = line.indexOf('=');
+                        String k = line.substring(0, eq).trim();
+                        if (k.equals(key)) {
+                            String v = line.substring(eq + 1).trim();
+                            if ((v.startsWith("\"") && v.endsWith("\"")) || (v.startsWith("'") && v.endsWith("'"))) {
+                                v = v.substring(1, v.length() - 1);
+                            }
+                            if (!v.isEmpty()) {
+                                return v;
+                            }
+                        }
+                    }
+                } catch (Exception ignored) {}
+            }
+        }
+        return null;
     }
 
     /**
