@@ -465,12 +465,11 @@ public class StandaloneFlywayMigrationRunner {
 
     private static void assertSequenceReset(Statement stmt, String sequenceName) throws SQLException {
         try (ResultSet rs = stmt.executeQuery(
-                "SELECT last_value, is_called FROM pg_sequences WHERE schemaname = 'public' AND sequencename = '" + sequenceName + "'")) {
+                "SELECT last_value FROM pg_sequences WHERE schemaname = 'public' AND sequencename = '" + sequenceName + "'")) {
             if (rs.next()) {
                 long lastVal = rs.getLong("last_value");
-                boolean isCalled = rs.getBoolean("is_called");
-                if (lastVal != 1 || isCalled) {
-                    throw new IllegalStateException("Sequence '" + sequenceName + "' is not cleanly reset to (1, false). Current: (" + lastVal + ", " + isCalled + ")");
+                if (lastVal != 1) {
+                    throw new IllegalStateException("Sequence '" + sequenceName + "' is not cleanly reset to 1. Current: " + lastVal);
                 }
             }
         }
