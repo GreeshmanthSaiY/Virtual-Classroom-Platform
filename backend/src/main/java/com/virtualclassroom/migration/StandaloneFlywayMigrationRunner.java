@@ -177,7 +177,12 @@ public class StandaloneFlywayMigrationRunner {
         Flyway flyway = Flyway.configure()
                 .dataSource(url, username, password)
                 .locations("classpath:db/migration")
-                .baselineOnMigrate(true)
+                .schemas("public")
+                .defaultSchema("public")
+                .table("flyway_schema_history")
+                .baselineOnMigrate(false)
+                .validateOnMigrate(true)
+                .cleanDisabled(true)
                 .load();
 
         return executeMigrationInternal(flyway, flyway.getConfiguration().getDataSource(), true);
@@ -190,7 +195,12 @@ public class StandaloneFlywayMigrationRunner {
         Flyway flyway = Flyway.configure()
                 .dataSource(dataSource)
                 .locations("classpath:db/migration")
-                .baselineOnMigrate(true)
+                .schemas("public")
+                .defaultSchema("public")
+                .table("flyway_schema_history")
+                .baselineOnMigrate(false)
+                .validateOnMigrate(true)
+                .cleanDisabled(true)
                 .load();
 
         return executeMigrationInternal(flyway, dataSource, false);
