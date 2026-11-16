@@ -249,7 +249,7 @@ class StandaloneFlywayMigrationRunnerTest {
             StandaloneFlywayMigrationRunner.MigrationRunResult result =
                     StandaloneFlywayMigrationRunner.runForTest(ds);
 
-            assertTrue(result.successful(), "Migration run must succeed");
+            assertTrue(result.successful(), () -> "Migration run must succeed. Error: " + result.errorMessage());
             assertEquals(5, result.migrationsExecuted(), "Must execute exactly 5 migrations (V1 to V5)");
             assertEquals("5", result.targetSchemaVersion(), "Target schema version must be 5");
             assertNull(result.errorMessage());
@@ -322,13 +322,13 @@ class StandaloneFlywayMigrationRunnerTest {
             // Run 1: Applies V1-V5
             StandaloneFlywayMigrationRunner.MigrationRunResult result1 =
                     StandaloneFlywayMigrationRunner.runForTest(ds);
-            assertTrue(result1.successful());
+            assertTrue(result1.successful(), () -> "Run 1 must succeed. Error: " + result1.errorMessage());
             assertEquals(5, result1.migrationsExecuted());
 
             // Run 2: Re-run on already migrated schema
             StandaloneFlywayMigrationRunner.MigrationRunResult result2 =
                     StandaloneFlywayMigrationRunner.runForTest(ds);
-            assertTrue(result2.successful(), "Second run must succeed idempotently");
+            assertTrue(result2.successful(), () -> "Second run must succeed idempotently. Error: " + result2.errorMessage());
             assertEquals(0, result2.migrationsExecuted(), "Second run must execute 0 migrations");
             assertEquals("5", result2.targetSchemaVersion(), "Target schema version must remain 5");
             assertNull(result2.errorMessage());
@@ -358,7 +358,7 @@ class StandaloneFlywayMigrationRunnerTest {
             // Run migrations first
             StandaloneFlywayMigrationRunner.MigrationRunResult result =
                     StandaloneFlywayMigrationRunner.runForTest(ds);
-            assertTrue(result.successful());
+            assertTrue(result.successful(), () -> "Migration run must succeed before Hibernate check. Error: " + result.errorMessage());
 
             // Build Hibernate metadata and validate schema against all 21 entities
             org.hibernate.boot.registry.StandardServiceRegistry registry =
