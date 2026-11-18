@@ -1,25 +1,37 @@
 name: Staging Deployment
 
+# ==============================================================================
+# Staging Deployment Pipeline — Hardened Manual-Only Gated Workflow (M19.1)
+#
+# Safeguards:
+#   1. Manual workflow_dispatch ONLY (zero automatic push deployments).
+#   2. Safe-by-default inputs: dry_run_only=true, confirm_live_deployment=false.
+#   3. Live deployment requires ALL of:
+#        - Branch is strictly refs/heads/develop
+#        - dry_run_only == false
+#        - confirm_live_deployment == true
+#        - GitHub Environment 'staging' approval & secret validation pass
+#   4. Render & Vercel deployment steps cannot execute on dry runs or unconfirmed runs.
+#   5. Live smoke tests run ONLY if deploy-staging explicitly succeeds.
+# ==============================================================================
 on:
   workflow_dispatch:
     inputs:
       dry_run_only:
-        description: 'Run pre-deployment verification in DRY-RUN mode without triggering actual deployments'
+        description: 'Run pre-deployment verification in DRY-RUN mode without triggering any Render or Vercel deployments (default: true)'
+        required: false
+        default: true
+        type: boolean
+      confirm_live_deployment:
+        description: 'Explicit operator confirmation required for LIVE staging deployment (must be true AND dry_run_only must be false)'
         required: false
         default: false
         type: boolean
       skip_smoke_tests:
-        description: 'Skip post-deployment automated smoke tests'
+        description: 'Skip post-deployment automated smoke tests after a confirmed live deployment'
         required: false
         default: false
         type: boolean
-  push:
-    branches:
-      - develop
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - '.gitignore'
 
 concurrency:
   group: deploy-staging
@@ -31,32 +43,60 @@ permissions:
 
 jobs:
   # ============================================================================
-  # 1. Preflight Validation & Secrets Verification Gate
+  # 1. Branch Restriction, Explicit Confirmation & Secrets Verification Gate
   # ============================================================================
   staging-preflight:
-    name: Staging Preflight & Secrets Gate
+    name: Staging Preflight, Branch & Secrets Gate
     runs-on: ubuntu-latest
     environment:
       name: staging
     outputs:
       is_dry_run: ${{ steps.check-mode.outputs.is_dry_run }}
+      allow_live_deploy: ${{ steps.check-mode.outputs.allow_live_deploy }}
     steps:
+      - name: Enforce develop branch restriction
+        env:
+          CURRENT_REF: ${{ github.ref }}
+        run: |
+          echo "Evaluating execution branch: ${CURRENT_REF}"
+          if [ "${CURRENT_REF}" != "refs/heads/develop" ]; then
+            echo "::error ::Staging deployment workflow is restricted exclusively to branch 'develop'. Ref '${CURRENT_REF}' is prohibited. NO DEPLOYMENT PERFORMED."
+            exit 1
+          fi
+          echo "Branch verification passed: refs/heads/develop."
+
+      - name: Evaluate execution mode and explicit live confirmation
+        id: check-mode
+        env:
+          INPUT_DRY_RUN: ${{ inputs.dry_run_only }}
+          INPUT_CONFIRM_LIVE: ${{ inputs.confirm_live_deployment }}
+        run: |
+          echo "Inputs received -> dry_run_only=${INPUT_DRY_RUN}, confirm_live_deployment=${INPUT_CONFIRM_LIVE}"
+
+          if [ "${INPUT_DRY_RUN}" = "true" ]; then
+            echo "is_dry_run=true" >> "$GITHUB_OUTPUT"
+            echo "allow_live_deploy=false" >> "$GITHUB_OUTPUT"
+            echo "Execution Mode: DRY-RUN ONLY (Render and Vercel deployments are disabled)."
+            exit 0
+          fi
+
+          if [ "${INPUT_DRY_RUN}" = "false" ] && [ "${INPUT_CONFIRM_LIVE}" = "true" ]; then
+            echo "is_dry_run=false" >> "$GITHUB_OUTPUT"
+            echo "allow_live_deploy=true" >> "$GITHUB_OUTPUT"
+            echo "Execution Mode: CONFIRMED LIVE STAGING DEPLOYMENT (dry_run_only=false AND confirm_live_deployment=true on develop)."
+            exit 0
+          fi
+
+          echo "is_dry_run=false" >> "$GITHUB_OUTPUT"
+          echo "allow_live_deploy=false" >> "$GITHUB_OUTPUT"
+          echo "::error ::Live deployment blocked: dry_run_only=false was specified without explicit confirm_live_deployment=true. Set BOTH dry_run_only=false and confirm_live_deployment=true to authorize live deployment. NO DEPLOYMENT PERFORMED."
+          exit 1
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Evaluate execution mode
-        id: check-mode
-        run: |
-          if [ "${{ inputs.dry_run_only }}" = "true" ]; then
-            echo "is_dry_run=true" >> $GITHUB_OUTPUT
-            echo "Execution Mode: STANDALONE DRY-RUN (Manual simulation requested)"
-          else
-            echo "is_dry_run=false" >> $GITHUB_OUTPUT
-            echo "Execution Mode: LIVE STAGING DEPLOYMENT"
-          fi
-
-      - name: Validate required staging secrets
-        if: ${{ steps.check-mode.outputs.is_dry_run != 'true' }}
+      - name: Validate required staging secrets (live mode only)
+        if: ${{ steps.check-mode.outputs.allow_live_deploy == 'true' }}
         env:
           RENDER_HOOK: ${{ secrets.RENDER_STAGING_DEPLOY_HOOK_URL }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -64,7 +104,7 @@ jobs:
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           STAGING_BACKEND: ${{ secrets.STAGING_BACKEND_URL }}
         run: |
-          echo "Verifying required staging deployment secrets..."
+          echo "Verifying required staging deployment secrets (names only; values are never printed)..."
           MISSING_SECRETS=()
 
           if [ -z "$RENDER_HOOK" ]; then
@@ -95,11 +135,20 @@ jobs:
 
   # ============================================================================
   # 2. Staging Deployment Gate (Render Backend & Vercel Frontend)
+  #    Requires ALL explicit conditions + GitHub Environment 'staging' approval.
   # ============================================================================
   deploy-staging:
     name: Deploy to Staging Environment
     needs: [staging-preflight]
-    if: ${{ needs.staging-preflight.outputs.is_dry_run != 'true' }}
+    if: >-
+      ${{
+        needs.staging-preflight.result == 'success' &&
+        github.ref == 'refs/heads/develop' &&
+        inputs.dry_run_only == false &&
+        inputs.confirm_live_deployment == true &&
+        needs.staging-preflight.outputs.is_dry_run == 'false' &&
+        needs.staging-preflight.outputs.allow_live_deploy == 'true'
+      }}
     runs-on: ubuntu-latest
     environment:
       name: staging
@@ -122,14 +171,25 @@ jobs:
       # ------------------------------------------------------------------------
       - name: Deploy Backend Service to Render Staging
         id: deploy-backend
+        if: >-
+          ${{
+            github.ref == 'refs/heads/develop' &&
+            inputs.dry_run_only == false &&
+            inputs.confirm_live_deployment == true &&
+            needs.staging-preflight.outputs.allow_live_deploy == 'true'
+          }}
         env:
           RENDER_HOOK_URL: ${{ secrets.RENDER_STAGING_DEPLOY_HOOK_URL }}
         run: |
+          if [ -z "$RENDER_HOOK_URL" ]; then
+            echo "::error ::RENDER_STAGING_DEPLOY_HOOK_URL is not configured."
+            exit 1
+          fi
           echo "Triggering Render staging deployment hook..."
           HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$RENDER_HOOK_URL")
           if [ "$HTTP_STATUS" -eq 200 ] || [ "$HTTP_STATUS" -eq 201 ]; then
             echo "Render staging deployment triggered successfully (HTTP $HTTP_STATUS)."
-            echo "backend_status=DEPLOYED" >> $GITHUB_OUTPUT
+            echo "backend_status=DEPLOYED" >> "$GITHUB_OUTPUT"
           else
             echo "::error ::Render staging deployment hook failed with HTTP $HTTP_STATUS."
             exit 1
@@ -140,11 +200,22 @@ jobs:
       # ------------------------------------------------------------------------
       - name: Deploy Frontend to Vercel Staging
         id: deploy-frontend
+        if: >-
+          ${{
+            github.ref == 'refs/heads/develop' &&
+            inputs.dry_run_only == false &&
+            inputs.confirm_live_deployment == true &&
+            needs.staging-preflight.outputs.allow_live_deploy == 'true'
+          }}
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
+          if [ -z "$VERCEL_TOKEN" ] || [ -z "$VERCEL_ORG_ID" ] || [ -z "$VERCEL_PROJECT_ID" ]; then
+            echo "::error ::Required Vercel staging secrets are missing."
+            exit 1
+          fi
           echo "Installing Vercel CLI..."
           npm install -g vercel@latest
           cd frontend
@@ -159,15 +230,23 @@ jobs:
             exit 1
           fi
           echo "Vercel staging URL: $DEPLOY_URL"
-          echo "vercel_url=$DEPLOY_URL" >> $GITHUB_OUTPUT
+          echo "vercel_url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
 
   # ============================================================================
-  # 3. Post-Deployment Live Smoke Tests (Separated Job)
+  # 3. Post-Deployment Live Smoke Tests
+  #    Runs ONLY when deploy-staging actually executed AND succeeded.
   # ============================================================================
   staging-smoke-tests:
     name: Staging Live Smoke & Contract Tests
     needs: [staging-preflight, deploy-staging]
-    if: ${{ success() && inputs.skip_smoke_tests != true && needs.staging-preflight.outputs.is_dry_run != 'true' }}
+    if: >-
+      ${{
+        needs.staging-preflight.result == 'success' &&
+        needs.deploy-staging.result == 'success' &&
+        needs.staging-preflight.outputs.allow_live_deploy == 'true' &&
+        needs.deploy-staging.outputs.backend_status == 'DEPLOYED' &&
+        inputs.skip_smoke_tests != true
+      }}
     runs-on: ubuntu-latest
     environment:
       name: staging
@@ -205,8 +284,8 @@ jobs:
           fi
           echo "Target Frontend: $FRONTEND_URL"
           echo "Target Backend:  $BACKEND_URL"
-          echo "frontend_url=$FRONTEND_URL" >> $GITHUB_OUTPUT
-          echo "backend_url=$BACKEND_URL" >> $GITHUB_OUTPUT
+          echo "frontend_url=$FRONTEND_URL" >> "$GITHUB_OUTPUT"
+          echo "backend_url=$BACKEND_URL" >> "$GITHUB_OUTPUT"
 
       - name: Execute Live Staging Smoke Tests
         env:
@@ -217,12 +296,17 @@ jobs:
           node scripts/staging_smoke_tests.js --frontend="$FRONTEND_URL" --backend="$BACKEND_URL"
 
   # ============================================================================
-  # 4. Standalone Dry-Run Smoke Test (Only if explicitly selected)
+  # 4. Standalone Dry-Run Smoke Test (Default Safe Mode — Zero Deployments)
   # ============================================================================
   dry-run-smoke-tests:
     name: Standalone Smoke Test Dry-Run
     needs: [staging-preflight]
-    if: ${{ needs.staging-preflight.outputs.is_dry_run == 'true' }}
+    if: >-
+      ${{
+        needs.staging-preflight.result == 'success' &&
+        needs.staging-preflight.outputs.is_dry_run == 'true' &&
+        needs.staging-preflight.outputs.allow_live_deploy == 'false'
+      }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -236,5 +320,5 @@ jobs:
       - name: Run Dry-Run Smoke Test Specification
         run: |
           echo "Running standalone dry-run smoke test specification..."
-          echo "NOTE: Deployments were NOT performed in dry-run mode."
+          echo "NOTE: Render and Vercel deployments were NOT performed in dry-run mode."
           node scripts/staging_smoke_tests.js --dry-run
