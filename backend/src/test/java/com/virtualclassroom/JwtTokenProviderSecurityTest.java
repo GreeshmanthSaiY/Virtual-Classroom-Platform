@@ -31,6 +31,28 @@ class JwtTokenProviderSecurityTest {
     }
 
     @Test
+    @DisplayName("Throws exception if staging profile uses fallback dev secret")
+    void constructor_StagingProfileWithDevSecret_ThrowsException() {
+        MockEnvironment stagingEnv = new MockEnvironment();
+        stagingEnv.setActiveProfiles("staging");
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> new JwtTokenProvider(JwtTokenProvider.LOCAL_DEV_FALLBACK_SECRET, 86400000L, stagingEnv));
+
+        assertTrue(ex.getMessage().contains("Staging profile cannot use the default development JWT secret"));
+    }
+
+    @Test
+    @DisplayName("Permits custom secure 256-bit secret in staging profile")
+    void constructor_StagingProfileWithSecureSecret_Succeeds() {
+        MockEnvironment stagingEnv = new MockEnvironment();
+        stagingEnv.setActiveProfiles("staging");
+
+        String secureSecret = "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970";
+        assertDoesNotThrow(() -> new JwtTokenProvider(secureSecret, 86400000L, stagingEnv));
+    }
+
+    @Test
     @DisplayName("Permits fallback dev secret in local/test profile")
     void constructor_LocalProfileWithDevSecret_Succeeds() {
         MockEnvironment localEnv = new MockEnvironment();

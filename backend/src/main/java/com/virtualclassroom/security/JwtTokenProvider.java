@@ -42,6 +42,9 @@ public class JwtTokenProvider {
                 if ("prod".equalsIgnoreCase(profile) || "production".equalsIgnoreCase(profile)) {
                     throw new IllegalStateException("Production profile cannot use the default development JWT secret");
                 }
+                if ("staging".equalsIgnoreCase(profile)) {
+                    throw new IllegalStateException("Staging profile cannot use the default development JWT secret");
+                }
             }
         }
         byte[] keyBytes = Decoders.BASE64.decode(secret);

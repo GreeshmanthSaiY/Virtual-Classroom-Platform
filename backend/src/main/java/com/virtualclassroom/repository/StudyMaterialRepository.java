@@ -4,6 +4,8 @@ import com.virtualclassroom.model.StudyMaterial;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -16,5 +18,8 @@ public interface StudyMaterialRepository extends JpaRepository<StudyMaterial, Lo
     List<StudyMaterial> findByUploaderIdAndSubjectId(Long uploaderId, Integer subjectId);
     List<StudyMaterial> findBySubjectIdIn(List<Integer> subjectIds);
     long countByUploaderId(Long uploaderId);
+
+    @Query("SELECT m FROM StudyMaterial m WHERE m.fileUrl = :path OR m.fileUrl LIKE CONCAT('%/', :path)")
+    List<StudyMaterial> findByStoragePath(@Param("path") String path);
 }
 

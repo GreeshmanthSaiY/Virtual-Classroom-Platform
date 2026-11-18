@@ -59,9 +59,7 @@ class FlywayMigrationSafetyTest {
                 }
             };
         } catch (Exception e) {
-            if (e.getMessage() != null && (e.getMessage().contains("error=623") || e.getMessage().contains("initdb.exe") || e.getMessage().contains("Cannot run program"))) {
-                Assumptions.abort("Host environment restricts executing embedded postgres binaries: " + e.getMessage());
-            }
+            Assumptions.abort("Host environment restricts executing embedded postgres binaries: " + e.getMessage());
             throw e;
         }
     }

@@ -1,3 +1,12 @@
+# ==============================================================================
+# Virtual Classroom Platform - Production Environment Configuration Profile
+# Hardened per Milestone 18.2.1 / 18.3 Security Remediation
+# ==============================================================================
+server:
+  error:
+    include-message: never
+    include-binding-errors: never
+
 spring:
   datasource:
     url: ${DATABASE_URL}
@@ -5,18 +14,28 @@ spring:
     password: ${DATABASE_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
-      maximum-pool-size: ${DB_POOL_MAX:10}
-      minimum-idle: ${DB_POOL_MIN:2}
+      maximum-pool-size: ${DB_POOL_MAX:15}
+      minimum-idle: ${DB_POOL_MIN:5}
       idle-timeout: 300000
       max-lifetime: 1200000
       connection-timeout: 20000
+      validation-timeout: 5000
+      leak-detection-threshold: 30000
+      initialization-fail-timeout: 1
+      pool-name: VirtualClassroomProdPool
+      data-source-properties:
+        sslmode: require
+        prepareThreshold: 5
+        preparedStatementCacheQueries: 256
+        preparedStatementCacheSizeMiB: 5
+        ApplicationName: virtual-classroom-prod
   jpa:
     hibernate:
       ddl-auto: validate
     show-sql: false
   flyway:
-    enabled: true
-    baseline-on-migrate: true
+    enabled: false
+    baseline-on-migrate: false
     locations: classpath:db/migration
 
 app:
@@ -34,4 +53,3 @@ app:
       url: ${SUPABASE_URL}
       key: ${SUPABASE_SERVICE_ROLE_KEY}
       bucket: ${SUPABASE_STORAGE_BUCKET:academic-assets}
-

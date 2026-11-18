@@ -24,5 +24,8 @@ public interface AssignmentSubmissionRepository extends JpaRepository<Assignment
 
     @Query("SELECT COUNT(s) FROM AssignmentSubmission s WHERE s.assignment.faculty.id = :facultyId AND s.gradePoints IS NULL")
     long countPendingGradingByFacultyId(@Param("facultyId") Long facultyId);
+
+    @Query("SELECT s FROM AssignmentSubmission s WHERE s.fileUrl = :path OR s.fileUrl LIKE CONCAT('%/', :path)")
+    List<AssignmentSubmission> findBySubmissionStoragePath(@Param("path") String path);
 }
 

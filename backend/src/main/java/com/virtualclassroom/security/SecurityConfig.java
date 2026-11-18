@@ -36,6 +36,9 @@ public class SecurityConfig {
     @Value("${app.cors.allowed-origins:http://localhost:3000,http://localhost:5173}")
     private String allowedOrigins;
 
+    @Value("${app.storage.provider:local}")
+    private String storageProvider = "local";
+
     public SecurityConfig(CustomUserDetailsService userDetailsService, JwtAuthenticationFilter jwtAuthenticationFilter) {
         this.userDetailsService = userDetailsService;
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
@@ -78,28 +81,31 @@ public class SecurityConfig {
                             response.getWriter().write("{\"success\":false,\"message\":\"Access denied: You do not possess the required role permissions.\",\"data\":null}");
                         })
                 )
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(
-                                "/api/v1/auth/login",
-                                "/api/v1/auth/register/**",
-                                "/api/v1/auth/refresh",
-                                "/api/v1/auth/forgot-password",
-                                "/api/v1/auth/reset-password",
-                                "/api/v1/storage/files/**",
-                                "/api-docs/**",
-                                "/v3/api-docs/**",
-                                "/swagger-ui/**",
-                                "/swagger-ui.html",
-                                "/actuator/health",
-                                "/actuator/info"
-                        ).permitAll()
-                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/courses/**").permitAll()
-                        .requestMatchers("/api/v1/courses/*/archive", "/api/v1/courses/*/unarchive").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers("/api/v1/admin/**").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers("/api/v1/faculty/**").hasAnyAuthority("ROLE_FACULTY", "ROLE_ADMIN")
-                        .requestMatchers("/api/v1/students/**").hasAnyAuthority("ROLE_STUDENT", "ROLE_ADMIN")
-                        .anyRequest().authenticated()
-                )
+                .authorizeHttpRequests(auth -> {
+                    auth.requestMatchers(
+                                    "/api/v1/auth/login",
+                                    "/api/v1/auth/register/**",
+                                    "/api/v1/auth/refresh",
+                                    "/api/v1/auth/forgot-password",
+                                    "/api/v1/auth/reset-password",
+                                    "/api-docs/**",
+                                    "/v3/api-docs/**",
+                                    "/swagger-ui/**",
+                                    "/swagger-ui.html",
+                                    "/actuator/health",
+                                    "/actuator/health/**",
+                                    "/actuator/info"
+                            ).permitAll();
+                    if ("local".equalsIgnoreCase(storageProvider)) {
+                        auth.requestMatchers("/api/v1/storage/files/**").permitAll();
+                    }
+                    auth.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/courses/**").permitAll()
+                            .requestMatchers("/api/v1/courses/*/archive", "/api/v1/courses/*/unarchive").hasAuthority("ROLE_ADMIN")
+                            .requestMatchers("/api/v1/admin/**").hasAuthority("ROLE_ADMIN")
+                            .requestMatchers("/api/v1/faculty/**").hasAnyAuthority("ROLE_FACULTY", "ROLE_ADMIN")
+                            .requestMatchers("/api/v1/students/**").hasAnyAuthority("ROLE_STUDENT", "ROLE_ADMIN")
+                            .anyRequest().authenticated();
+                })
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
