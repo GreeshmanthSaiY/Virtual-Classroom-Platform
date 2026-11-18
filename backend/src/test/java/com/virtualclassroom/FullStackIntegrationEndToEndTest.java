@@ -587,10 +587,39 @@ public class FullStackIntegrationEndToEndTest {
         String storagePath = objectMapper.readTree(uploadRes.getResponse().getContentAsString()).path("data").path("storagePath").asText();
         assertNotNull(storagePath);
 
-        // 2. Generate signed download URL
+        // 2a. Unlinked file uploaded by Faculty must be rejected for Student (fail-closed authorization)
         mockMvc.perform(get("/api/v1/storage/signed-download-url")
                         .param("path", storagePath)
                         .param("expiresIn", "1800")
+                        .header("Authorization", "Bearer " + studentToken))
+                .andExpect(status().isForbidden());
+
+        // 2b. Faculty uploader can generate a signed download URL for their own upload
+        mockMvc.perform(get("/api/v1/storage/signed-download-url")
+                        .param("path", storagePath)
+                        .param("expiresIn", "1800")
+                        .header("Authorization", "Bearer " + facultyToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        // 2c. Once published as a StudyMaterial for an enrolled subject, Student can obtain a signed download URL
+        CreateMaterialRequest materialReq = new CreateMaterialRequest();
+        materialReq.setSubjectId(seededSubject.getId());
+        materialReq.setTitle("Algorithms E2E Notes");
+        materialReq.setDescription("Published study material linked to private storage object");
+        materialReq.setFileUrl(storagePath);
+        materialReq.setFileSizeBytes(45L);
+        materialReq.setMimeType("application/pdf");
+
+        mockMvc.perform(post("/api/v1/faculty/materials")
+                        .header("Authorization", "Bearer " + facultyToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(materialReq)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/storage/signed-download-url")
+                        .param("path", storagePath)
+                        .param("expiresIn", "900")
                         .header("Authorization", "Bearer " + studentToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));

@@ -56,17 +56,51 @@ class StagingConfigurationRemediationTest {
         Properties props = yaml.getObject();
 
         assertNotNull(props, "application-staging.yml must be readable");
+        assertEquals("never", props.getProperty("server.error.include-message"));
+        assertEquals("never", props.getProperty("server.error.include-binding-errors"));
         assertEquals("${DATABASE_URL}", props.getProperty("spring.datasource.url"));
         assertEquals("${DATABASE_USERNAME}", props.getProperty("spring.datasource.username"));
         assertEquals("${DATABASE_PASSWORD}", props.getProperty("spring.datasource.password"));
         assertEquals("org.postgresql.Driver", props.getProperty("spring.datasource.driver-class-name"));
+        assertEquals("30000", props.getProperty("spring.datasource.hikari.leak-detection-threshold"));
+        assertEquals("5000", props.getProperty("spring.datasource.hikari.validation-timeout"));
+        assertEquals("1", props.getProperty("spring.datasource.hikari.initialization-fail-timeout"));
+        assertEquals("require", props.getProperty("spring.datasource.hikari.data-source-properties.sslmode"));
+        assertEquals("5", props.getProperty("spring.datasource.hikari.data-source-properties.prepareThreshold"));
+        assertEquals("256", props.getProperty("spring.datasource.hikari.data-source-properties.preparedStatementCacheQueries"));
+        assertEquals("5", props.getProperty("spring.datasource.hikari.data-source-properties.preparedStatementCacheSizeMiB"));
         assertEquals("validate", props.getProperty("spring.jpa.hibernate.ddl-auto"));
-        assertEquals("true", props.getProperty("spring.flyway.enabled"));
-        assertEquals("true", props.getProperty("spring.flyway.baseline-on-migrate"));
+        assertEquals("false", props.getProperty("spring.flyway.enabled"));
+        assertEquals("false", props.getProperty("spring.flyway.baseline-on-migrate"));
         assertEquals("${COOKIE_SECURE:true}", props.getProperty("app.security.cookie-secure"));
         assertEquals("${COOKIE_SAME_SITE:None}", props.getProperty("app.security.cookie-same-site"));
+        assertEquals("${CORS_ALLOWED_ORIGINS:https://virtual-classroom-staging.vercel.app}", props.getProperty("app.cors.allowed-origins"));
+        assertFalse(props.getProperty("app.cors.allowed-origins").contains("localhost"),
+                "Staging default CORS must not permit localhost");
         assertEquals("${STORAGE_PROVIDER:supabase}", props.getProperty("app.storage.provider"));
         assertEquals("${SUPABASE_STORAGE_BUCKET:academic-assets}", props.getProperty("app.storage.supabase.bucket"));
+    }
+
+    @Test
+    @DisplayName("Production Profile: application-prod.yml hardens Flyway, HikariCP, errors and excludes staging refs")
+    void prodProfile_ConfigurationFile_ValidatesContractAndIsolation() {
+        YamlPropertiesFactoryBean yaml = new YamlPropertiesFactoryBean();
+        yaml.setResources(new ClassPathResource("application-prod.yml"));
+        Properties props = yaml.getObject();
+
+        assertNotNull(props, "application-prod.yml must be readable");
+        assertEquals("never", props.getProperty("server.error.include-message"));
+        assertEquals("never", props.getProperty("server.error.include-binding-errors"));
+        assertEquals("false", props.getProperty("spring.flyway.enabled"));
+        assertEquals("false", props.getProperty("spring.flyway.baseline-on-migrate"));
+        assertEquals("30000", props.getProperty("spring.datasource.hikari.leak-detection-threshold"));
+        assertEquals("require", props.getProperty("spring.datasource.hikari.data-source-properties.sslmode"));
+        assertEquals("5", props.getProperty("spring.datasource.hikari.data-source-properties.prepareThreshold"));
+        for (String key : props.stringPropertyNames()) {
+            String value = props.getProperty(key, "");
+            assertFalse(value.contains("zrbpjcfssbtxxgrjtsca"),
+                    "Production profile must never reference staging project ref in key: " + key);
+        }
     }
 
     // =========================================================================

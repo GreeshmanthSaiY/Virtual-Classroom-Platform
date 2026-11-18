@@ -44,6 +44,20 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error("Access denied: You do not possess the required role permissions."));
     }
 
+    @ExceptionHandler(SecurityException.class)
+    public ResponseEntity<ApiResponse<Void>> handleSecurityException(SecurityException ex) {
+        log.warn("Rejected unsafe resource path or security violation: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error("Invalid or unauthorized resource path."));
+    }
+
+    @ExceptionHandler(StorageOperationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleStorageOperationException(StorageOperationException ex) {
+        log.error("Cloud storage operation failed: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                .body(ApiResponse.error("Storage service operation failed. Please try again later."));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Map<String, String>>> handleValidationExceptions(MethodArgumentNotValidException ex) {
         Map<String, String> errors = new HashMap<>();

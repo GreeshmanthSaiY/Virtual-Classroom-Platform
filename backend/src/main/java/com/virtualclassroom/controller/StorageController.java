@@ -4,19 +4,22 @@ import com.virtualclassroom.dto.ApiResponse;
 import com.virtualclassroom.dto.FileUploadResponse;
 import com.virtualclassroom.dto.SignedUploadUrlRequest;
 import com.virtualclassroom.dto.SignedUploadUrlResponse;
-import com.virtualclassroom.model.Role;
 import com.virtualclassroom.model.User;
 import com.virtualclassroom.repository.UserRepository;
 import com.virtualclassroom.security.UserPrincipal;
 import com.virtualclassroom.service.FileStorageService;
+import com.virtualclassroom.service.StorageAuthorizationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -31,10 +34,21 @@ public class StorageController {
 
     private final FileStorageService storageService;
     private final UserRepository userRepository;
+    private final StorageAuthorizationService storageAuthorizationService;
 
-    public StorageController(FileStorageService storageService, UserRepository userRepository) {
+    @Autowired
+    public StorageController(
+            FileStorageService storageService,
+            UserRepository userRepository,
+            StorageAuthorizationService storageAuthorizationService
+    ) {
         this.storageService = storageService;
         this.userRepository = userRepository;
+        this.storageAuthorizationService = storageAuthorizationService;
+    }
+
+    public StorageController(FileStorageService storageService, UserRepository userRepository) {
+        this(storageService, userRepository, null);
     }
 
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -64,18 +78,28 @@ public class StorageController {
 
     @GetMapping("/signed-download-url")
     @PreAuthorize("isAuthenticated()")
-    @Operation(summary = "Generate a time-limited signed URL for secure file download")
+    @Operation(summary = "Generate a short-lived signed URL for authorized private file download")
     public ResponseEntity<ApiResponse<String>> getSignedDownloadUrl(
             @RequestParam("path") String storagePath,
-            @RequestParam(value = "expiresIn", defaultValue = "3600") int expiresIn
+            @RequestParam(value = "expiresIn", defaultValue = "900") int expiresIn,
+            @AuthenticationPrincipal UserPrincipal principal
     ) {
+        storageService.validateStoragePath(storagePath);
+        if (storageAuthorizationService == null) {
+            throw new AccessDeniedException("Storage authorization service is unavailable.");
+        }
+        storageAuthorizationService.authorizeDownload(storagePath, principal);
         String signedUrl = storageService.generateSignedDownloadUrl(storagePath, expiresIn);
         return ResponseEntity.ok(ApiResponse.success(signedUrl, "Signed download URL generated"));
     }
 
     @GetMapping("/files/**")
-    @Operation(summary = "Retrieve or stream locally stored file")
+    @Operation(summary = "Retrieve or stream locally stored file (local development mode only)")
     public ResponseEntity<Resource> getLocalFile(HttpServletRequest request) {
+        if (storageService.isSupabaseConfigured() || storageService.isCloudStorageRequiredProfile()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+
         String fullPath = request.getRequestURI();
         String prefix = "/api/v1/storage/files/";
         int index = fullPath.indexOf(prefix);

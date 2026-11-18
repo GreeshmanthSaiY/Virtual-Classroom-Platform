@@ -21,7 +21,7 @@ services:
       - key: DATABASE_URL
         sync: false
       - key: DATABASE_USERNAME
-        value: postgres
+        value: vc_app_user.zrbpjcfssbtxxgrjtsca
       - key: DATABASE_PASSWORD
         sync: false
       - key: JWT_SECRET
@@ -31,7 +31,7 @@ services:
       - key: COOKIE_SECURE
         value: true
       - key: CORS_ALLOWED_ORIGINS
-        value: https://virtual-classroom-staging.vercel.app,http://localhost:5173
+        value: https://virtual-classroom-staging.vercel.app
       - key: STORAGE_PROVIDER
         value: supabase
       - key: SUPABASE_URL
@@ -60,7 +60,7 @@ services:
       - key: DATABASE_URL
         sync: false
       - key: DATABASE_USERNAME
-        value: postgres
+        sync: false # Tenant-qualified production runtime username configured securely in Render Dashboard
       - key: DATABASE_PASSWORD
         sync: false
       - key: JWT_SECRET
