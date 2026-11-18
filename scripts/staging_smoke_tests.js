@@ -111,30 +111,36 @@ const tests = [
   {
     name: 'Backend Actuator Liveness Probe',
     fn: async () => {
-      if (dryRun) return { passed: true, detail: 'Liveness probe path /actuator/health/liveness verified' };
+      if (dryRun) return { passed: true, detail: 'Liveness probe path /actuator/health/liveness requires HTTP 200 UP' };
       const res = await makeRequest(`${backendUrl}/actuator/health/liveness`);
-      if (res.statusCode !== 200 && res.statusCode !== 404) {
-        throw new Error(`Actuator responded with unexpected status ${res.statusCode}`);
+      if (res.statusCode !== 200) {
+        throw new Error(`Expected HTTP 200 on /actuator/health/liveness, received ${res.statusCode}`);
       }
-      return { passed: true, detail: `Liveness probe reachable (HTTP ${res.statusCode})` };
+      if (!res.body.includes('"UP"')) {
+        throw new Error(`Expected UP status in liveness payload, received: ${res.body.slice(0, 120)}`);
+      }
+      return { passed: true, detail: 'Liveness probe returned HTTP 200 UP' };
     },
   },
   {
-    name: 'Backend API Docs / Health Probe',
+    name: 'Backend Health Probe (/actuator/health)',
     fn: async () => {
-      if (dryRun) return { passed: true, detail: 'Actuator health endpoint verified' };
+      if (dryRun) return { passed: true, detail: 'Actuator health endpoint requires HTTP 200 UP' };
       const res = await makeRequest(`${backendUrl}/actuator/health`);
       if (res.statusCode !== 200) {
         throw new Error(`Expected HTTP 200 but received ${res.statusCode}`);
       }
-      return { passed: true, detail: 'Backend health is UP' };
+      if (!res.body.includes('"UP"')) {
+        throw new Error(`Expected UP status in health payload, received: ${res.body.slice(0, 120)}`);
+      }
+      return { passed: true, detail: 'Backend health is UP (HTTP 200)' };
     },
   },
   {
-    name: 'Protected Endpoint Security Barrier (/api/v1/admin/dashboard)',
+    name: 'Protected Endpoint Security Barrier (/api/v1/admin/metrics)',
     fn: async () => {
-      if (dryRun) return { passed: true, detail: 'Admin route 401 gate verified' };
-      const res = await makeRequest(`${backendUrl}/api/v1/admin/dashboard`);
+      if (dryRun) return { passed: true, detail: 'Admin metrics route 401/403 gate verified' };
+      const res = await makeRequest(`${backendUrl}/api/v1/admin/metrics`);
       if (res.statusCode !== 401 && res.statusCode !== 403) {
         throw new Error(`Expected HTTP 401/403 for unauthenticated request, received ${res.statusCode}`);
       }
@@ -142,9 +148,20 @@ const tests = [
     },
   },
   {
+    name: 'Private Storage Local-Files Barrier (/api/v1/storage/files/*)',
+    fn: async () => {
+      if (dryRun) return { passed: true, detail: 'Local storage file endpoint disabled in staging (401/403)' };
+      const res = await makeRequest(`${backendUrl}/api/v1/storage/files/probe.txt`);
+      if (res.statusCode !== 401 && res.statusCode !== 403) {
+        throw new Error(`Expected HTTP 401/403 on disabled local storage route, received ${res.statusCode}`);
+      }
+      return { passed: true, detail: `Blocked public local-file route with HTTP ${res.statusCode}` };
+    },
+  },
+  {
     name: 'Authentication Input Validation Barrier (/api/v1/auth/login)',
     fn: async () => {
-      if (dryRun) return { passed: true, detail: 'Auth validation 400 gate verified' };
+      if (dryRun) return { passed: true, detail: 'Auth validation 400/401 gate verified' };
       const res = await makeRequest(`${backendUrl}/api/v1/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -157,17 +174,48 @@ const tests = [
     },
   },
   {
-    name: 'CORS Preflight Headers Verification',
+    name: 'CORS Preflight Allowed Staging Origin Verification',
     fn: async () => {
-      if (dryRun) return { passed: true, detail: 'CORS policy configured for staging frontend' };
+      if (dryRun) return { passed: true, detail: 'CORS policy allows staging frontend origin with credentials' };
       const res = await makeRequest(`${backendUrl}/api/v1/auth/login`, {
         method: 'OPTIONS',
         headers: {
           Origin: frontendUrl,
           'Access-Control-Request-Method': 'POST',
+          'Access-Control-Request-Headers': 'Content-Type,Authorization',
         },
       });
-      return { passed: true, detail: `Preflight responded with HTTP ${res.statusCode}` };
+      const allowOrigin = res.headers['access-control-allow-origin'];
+      const allowCreds = res.headers['access-control-allow-credentials'];
+      if (res.statusCode !== 200 && res.statusCode !== 204) {
+        throw new Error(`Expected HTTP 200/204 for valid CORS preflight, received ${res.statusCode}`);
+      }
+      if (allowOrigin !== frontendUrl) {
+        throw new Error(`Expected Access-Control-Allow-Origin="${frontendUrl}", received "${allowOrigin || 'missing'}"`);
+      }
+      if (allowCreds !== 'true') {
+        throw new Error(`Expected Access-Control-Allow-Credentials="true", received "${allowCreds || 'missing'}"`);
+      }
+      return { passed: true, detail: `Allowed staging origin ${allowOrigin} with credentials=true (HTTP ${res.statusCode})` };
+    },
+  },
+  {
+    name: 'CORS Preflight Unauthorized Origin Rejection',
+    fn: async () => {
+      if (dryRun) return { passed: true, detail: 'CORS policy rejects unauthorized third-party origins' };
+      const rogueOrigin = 'https://unauthorized-origin.invalid';
+      const res = await makeRequest(`${backendUrl}/api/v1/auth/login`, {
+        method: 'OPTIONS',
+        headers: {
+          Origin: rogueOrigin,
+          'Access-Control-Request-Method': 'POST',
+        },
+      });
+      const allowOrigin = res.headers['access-control-allow-origin'];
+      if (allowOrigin === rogueOrigin || allowOrigin === '*') {
+        throw new Error(`Unauthorized origin was permitted: Access-Control-Allow-Origin="${allowOrigin}"`);
+      }
+      return { passed: true, detail: `Rejected unauthorized origin (HTTP ${res.statusCode}, ACAO=${allowOrigin || 'absent'})` };
     },
   },
 ];

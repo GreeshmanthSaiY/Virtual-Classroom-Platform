@@ -287,6 +287,24 @@ jobs:
           echo "frontend_url=$FRONTEND_URL" >> "$GITHUB_OUTPUT"
           echo "backend_url=$BACKEND_URL" >> "$GITHUB_OUTPUT"
 
+      - name: Wait for Render Staging Backend Rollout Readiness
+        env:
+          BACKEND_URL: ${{ steps.resolve-urls.outputs.backend_url }}
+        run: |
+          BACKEND_CLEAN="${BACKEND_URL%/}"
+          echo "Polling Render staging backend readiness at ${BACKEND_CLEAN}/actuator/health/liveness (up to 8 minutes)..."
+          for attempt in $(seq 1 32); do
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "${BACKEND_CLEAN}/actuator/health/liveness" || echo "000")
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "Staging backend liveness probe healthy (HTTP 200) on attempt ${attempt}/32."
+              exit 0
+            fi
+            echo "Attempt ${attempt}/32: HTTP ${HTTP_CODE} — waiting 15s for Render rollout..."
+            sleep 15
+          done
+          echo "::error ::Render staging backend did not return HTTP 200 on /actuator/health/liveness within 8 minutes."
+          exit 1
+
       - name: Execute Live Staging Smoke Tests
         env:
           FRONTEND_URL: ${{ steps.validate-urls.outputs.frontend_url }}

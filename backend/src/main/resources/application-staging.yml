@@ -53,3 +53,9 @@ app:
       url: ${SUPABASE_URL}
       key: ${SUPABASE_SERVICE_ROLE_KEY}
       bucket: ${SUPABASE_STORAGE_BUCKET:academic-assets}
+  bootstrap:
+    staging-admin:
+      enabled: ${STAGING_ADMIN_BOOTSTRAP_ENABLED:false}
+      email: ${STAGING_ADMIN_EMAIL:}
+      password: ${STAGING_ADMIN_PASSWORD:}
+      full-name: ${STAGING_ADMIN_FULL_NAME:Staging Administrator}
