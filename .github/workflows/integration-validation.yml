@@ -74,7 +74,7 @@ jobs:
           npm run build
           npm test -- --run
 
-      - name: Backend Tests with Real PostgreSQL 16 Service Container
+      - name: Backend Tests with Real PostgreSQL 17 Service Container
         env:
           POSTGRES_TEST_URL: jdbc:postgresql://localhost:5432/testdb
           POSTGRES_TEST_USER: postgres
