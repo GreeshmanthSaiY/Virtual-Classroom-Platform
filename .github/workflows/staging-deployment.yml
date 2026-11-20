@@ -289,7 +289,7 @@ jobs:
 
       - name: Wait for Render Staging Backend Rollout Readiness
         env:
-          BACKEND_URL: ${{ steps.resolve-urls.outputs.backend_url }}
+          BACKEND_URL: ${{ steps.validate-urls.outputs.backend_url }}
         run: |
           BACKEND_CLEAN="${BACKEND_URL%/}"
           echo "Polling Render staging backend readiness at ${BACKEND_CLEAN}/actuator/health/liveness (up to 8 minutes)..."
