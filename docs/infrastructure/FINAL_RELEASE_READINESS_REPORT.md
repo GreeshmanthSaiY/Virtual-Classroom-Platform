@@ -1,5 +1,5 @@
 # FINAL RELEASE READINESS & DEPLOYMENT PREPARATION REPORT
-**Virtual Classroom Platform — Master Engineering Sign-Off**  
+**Virtual Classroom Platform — Master Engineering Sign-Off (Reconciled)**  
 **Date:** 2026-11-20  
 **Author:** Principal Software Engineer, DevOps Architect & Release Manager  
 **Repository:** `GreeshmanthSaiY/Virtual-Classroom-Platform`  
@@ -13,7 +13,7 @@
 
 ### Overall Verdict: **CONDITIONALLY READY**
 
-The Virtual Classroom Platform repository has successfully completed all pre-deployment engineering milestones, code reviews, security hardening, automated test suites, bundle inspections, and branch cleanup.
+The Virtual Classroom Platform repository has successfully completed all pre-deployment engineering milestones, code reviews, security hardening, automated test suites, bundle inspections, configuration reconciliations, and branch cleanup.
 
 The codebase, database architecture, container packaging, and CI/CD pipelines are **100% verified and deployment-ready**.
 
@@ -28,13 +28,14 @@ Once those external dashboard values are populated, staging deployment can be tr
 
 ## 2. Integrated PR & Git State Verification
 
-All feature development, bug fixes, migration runners, and workflow safety mechanisms have been fully integrated into `origin/develop` across three approved pull requests:
+All feature development, bug fixes, migration runners, and workflow safety mechanisms have been fully integrated into `origin/develop` across three approved pull requests, with documentation finalized in PR #9:
 
-| Pull Request | Branch Name | Merge Commit SHA | Merged At (UTC) | Key Capabilities Delivered |
+| Pull Request | Branch Name | Merge Commit SHA / State | Merged At (UTC) | Key Capabilities Delivered |
 |---|---|---|---|---|
 | **PR #6** | `feature/staging-readiness-config` | `036f0381ee459d807ab5857d13de17a74a8cfdfd` | 2026-11-18 16:38:09 | Database-first execution design, Standalone Flyway Runner, least-privileged runtime role `vc_app_user`, RLS enablement across 22 tables, Storage security service. |
 | **PR #7** | `feature/staging-bootstrap-and-smoke-hardening` | `c197d262afa647c2da500025031a421f082b20eb` | 2026-11-20 15:23:52 | Staging administrator bootstrap runner, Render rollout health polling loop, Node.js smoke test suite, M19.4 verification reports. |
 | **PR #8** | `feature/pre-deployment-readiness-and-workflow-fix` | `4988faf8f7dc624a5fe56271715587864f24842c` | 2026-11-20 16:19:48 | Fixed deployment workflow step output reference (`steps.validate-urls.outputs.backend_url`), authored Staging Operations Runbook & Release Checklist. |
+| **PR #9** | `feature/final-release-readiness-and-hygiene` | **OPEN (Pending Review)** | *(Open)* | Reconciled release readiness report, pre-deployment checklist, post-deployment runbooks, branch cleanup audit, operator runbook, verification matrix. |
 
 ### Current Git Hierarchy
 - **`origin/develop`:** `4988faf8f7dc624a5fe56271715587864f24842c` (HEAD of develop, clean, 54 commits ahead of main, 0 behind).
@@ -58,7 +59,7 @@ Following Phase B safety rules, all temporary, reconcile, and obsolete feature b
   - `feature/pre-deployment-readiness-and-workflow-fix`
   - `reconcile/main-ci-into-develop`
   - `reconcile/main-into-develop`
-- **Post-Cleanup Status:** Exactly 3 branches remain locally and on origin. Zero commits or historical work lost. Full audit details in `docs/infrastructure/FINAL_BRANCH_CLEANUP_REPORT.md`.
+- **Post-Cleanup Status:** Exactly 3 long-term branches remain locally and on origin, plus `feature/final-release-readiness-and-hygiene` dedicated to PR #9. Zero commits or historical work lost. Full audit details in `docs/infrastructure/FINAL_BRANCH_CLEANUP_REPORT.md`.
 
 ---
 
@@ -73,7 +74,8 @@ Following Phase B safety rules, all temporary, reconcile, and obsolete feature b
   - Skips: **6** (Windows-specific `embedded-pg` binary constraint; 100% pass on Linux CI).
 - **Security Tests:**
   - `JwtTokenProviderSecurityTest`: PASSED (enforces 256-bit key entropy and rejects forged tokens).
-  - `StorageSecurityRemediationTest`: PASSED (validates private storage boundary and presigned URLs).
+  - `StorageSecurityRemediationTest`: PASSED (validates private storage boundary and presigned URLs for `academic-assets`).
+  - `StagingConfigurationRemediationTest`: PASSED (validates staging contract, bucket allowlist, and production isolation from staging ref `zrbpjcfssbtxxgrjtsca`).
   - `StagingAdminBootstrapRunnerTest`: PASSED (validates idempotency and conditional execution).
   - `BackendSecurityAuditTest`: PASSED.
 
@@ -98,17 +100,19 @@ Following Phase B safety rules, all temporary, reconcile, and obsolete feature b
 
 ---
 
-## 5. Security & Infrastructure Hardening Audit
+## 5. Security & Infrastructure Hardening Reconciliation
 
-### 5.1 Supabase PostgreSQL Database (Project: `tzbjmxtmysvzxdmspiui`)
+### 5.1 Supabase PostgreSQL Database
+- **Staging Project:** `zrbpjcfssbtxxgrjtsca` (`ap-south-1`).
+- **Production Project (Isolated):** `tzbjmxtmysvzxdmspiui` (`ap-south-1`).
 - **Schema Migrations:** V1 through V5 applied and verified in `flyway_schema_history`.
 - **Table Inventory:** 21 application tables + 1 Flyway history table.
 - **Row-Level Security (RLS):** Enabled and enforced across all 22 public tables.
-- **Runtime Identity:** Dedicated `vc_app_user` provisioned with `NOBYPASSRLS`, restricted table privileges (`SELECT`, `INSERT`, `UPDATE`, `DELETE`), and connection limit 20.
-- **Connection Architecture:** Configured for IPv4-compatible **Session Pooler** on port 6543 (`aws-0-ap-south-1.pooler.supabase.com`).
+- **Runtime Identity:** Dedicated `vc_app_user` provisioned with `NOBYPASSRLS`, restricted table privileges (`SELECT`, `INSERT`, `UPDATE`, `DELETE`), and connection limit 20. Staging pooler identity: `vc_app_user.zrbpjcfssbtxxgrjtsca`.
+- **Connection Architecture:** Configured for IPv4-compatible **Session Pooler** on port 6543 (`aws-0-ap-south-1.pooler.supabase.com:6543`).
 
-### 5.2 Supabase Private Storage (`classroom-materials`)
-- Bucket verified with `public = false`.
+### 5.2 Supabase Private Storage (`academic-assets`)
+- Dedicated canonical bucket `academic-assets` verified with `public = false`.
 - Direct unauthenticated access returns HTTP 400/404.
 - Presigned URL service (`FileStorageService`) signs access requests with short-lived HMAC tokens via `SUPABASE_SERVICE_ROLE_KEY`.
 
@@ -134,7 +138,7 @@ To transition from **CONDITIONALLY READY** to **LIVE STAGING DEPLOYED**, the ope
 2. Connect repository `GreeshmanthSaiY/Virtual-Classroom-Platform`.
 3. Set **Branch** to `develop`.
 4. Set **Runtime** to `Docker` (pointing to `backend/Dockerfile`).
-5. Set **Health Check Path** to `/actuator/health`.
+5. Set **Health Check Path** to `/actuator/health/liveness`.
 6. Under **Advanced**, toggle **Auto-Deploy** to **NO**.
 7. Under **Environment Variables**, add the variables documented in `docs/infrastructure/FINAL_ENVIRONMENT_VARIABLE_REFERENCE.md`.
 8. Under **Settings -> Deploy Hook**, click **Create Deploy Hook** and copy the resulting webhook URL.
@@ -145,19 +149,19 @@ To transition from **CONDITIONALLY READY** to **LIVE STAGING DEPLOYED**, the ope
 3. Set **Root Directory** to `frontend`.
 4. Framework preset: `Vite`.
 5. Under **Environment Variables**, add:
-   - `VITE_API_BASE_URL` = `https://<your-render-backend-name>.onrender.com/api/v1`
+   - `VITE_API_BASE_URL` = `https://virtual-classroom-backend-staging.onrender.com/api/v1`
 6. Click **Deploy** to establish initial project configuration.
 7. Under **Settings -> General**, copy the **Project ID** (`prj_...`).
 8. Under **Vercel Account Settings -> Tokens**, create a Personal Access Token (`VERCEL_TOKEN`).
 
 ### Task 3: Populate GitHub Environment Secrets
 Navigate to **GitHub -> Repository Settings -> Environments -> `staging` -> Environment Secrets** and add:
-- `RENDER_DEPLOY_HOOK_URL`: Webhook URL from Render.
+- `RENDER_STAGING_DEPLOY_HOOK_URL`: Webhook URL from Render.
+- `STAGING_BACKEND_URL`: `https://virtual-classroom-backend-staging.onrender.com`
+- `STAGING_FRONTEND_URL`: `https://virtual-classroom-staging.vercel.app`
 - `VERCEL_TOKEN`: Vercel Personal Access Token.
 - `VERCEL_ORG_ID`: Vercel Team / Account ID.
 - `VERCEL_PROJECT_ID`: Vercel Project ID.
-- `BACKEND_STAGING_URL`: `https://<your-render-backend-name>.onrender.com`
-- `FRONTEND_STAGING_URL`: `https://<your-vercel-frontend-name>.vercel.app`
 
 ### Task 4: Execute Gated Staging Deployment
 1. Navigate to **GitHub Actions -> Staging Deployment -> Run workflow**.
@@ -175,9 +179,12 @@ Navigate to **GitHub -> Repository Settings -> Environments -> `staging` -> Envi
 | Document Path | Description |
 |---|---|
 | `docs/infrastructure/FINAL_RELEASE_READINESS_REPORT.md` | This master release engineering sign-off report. |
+| `docs/infrastructure/MILESTONE_21_FINAL_CONFIGURATION_RECONCILIATION.md` | Authoritative reconciliation report resolving configuration variances. |
+| `docs/infrastructure/FINAL_OPERATOR_DEPLOYMENT_RUNBOOK.md` | Beginner-friendly operator runbook for external dashboard provisioning. |
+| `docs/infrastructure/FINAL_VERIFICATION_MATRIX.md` | Comprehensive status matrix across all platform subsystems. |
 | `docs/infrastructure/FINAL_PRE_DEPLOYMENT_CHECKLIST.md` | Authoritative pre-deployment checklist covering all subsystems. |
 | `docs/infrastructure/FINAL_POST_DEPLOYMENT_VERIFICATION.md` | Comprehensive post-deployment acceptance runbook and smoke test suite guide. |
 | `docs/infrastructure/FINAL_ENVIRONMENT_VARIABLE_REFERENCE.md` | Complete reference for Backend, Frontend, and GitHub Actions variables. |
 | `docs/infrastructure/FINAL_BRANCH_CLEANUP_REPORT.md` | Technical audit and verification of local and remote branch cleanup. |
 | `scripts/staging_smoke_tests.js` | Executable 9-point automated HTTP smoke testing suite. |
-| `docs/infrastructure/STAGING_OPERATIONS_RUNBOOK.md` | Ongoing operational runbook for staging maintenance and incident response. |
+| `docs/infrastructure/STAGING_OPERATIONS_RUNBOOK.md` | Operational runbook for staging maintenance and incident response. |

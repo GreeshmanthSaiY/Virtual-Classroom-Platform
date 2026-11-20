@@ -1,7 +1,7 @@
 # AUTHORITATIVE POST-DEPLOYMENT VERIFICATION RUNBOOK
-**Virtual Classroom Platform — Staging Release Acceptance Suite**  
+**Virtual Classroom Platform — Staging Release Acceptance Suite (Reconciled)**  
 **Date:** 2026-11-20  
-**Target Environments:** Render (Backend) + Vercel (Frontend) + Supabase (DB & Storage)  
+**Target Environments:** Render (Backend) + Vercel (Frontend) + Supabase Staging (`zrbpjcfssbtxxgrjtsca`)  
 **Execution Context:** Manual Operator or Automated CI Post-Deploy Phase
 
 ---
@@ -9,6 +9,12 @@
 ## 1. Overview & Verification Policy
 
 This runbook defines the complete post-deployment testing procedure to validate that both the backend on Render and frontend on Vercel are operational, secure, properly integrated, and performing within acceptable boundaries.
+
+### Target Infrastructure Identities
+- **Staging Supabase Project Ref:** `zrbpjcfssbtxxgrjtsca`
+- **Canonical Storage Bucket:** `academic-assets`
+- **Backend Service:** `virtual-classroom-backend-staging`
+- **Frontend Domain:** `https://virtual-classroom-staging.vercel.app`
 
 ### Safety Boundaries for Verification
 1. **No Destructive Operations:** Never delete live student or course data.
@@ -28,7 +34,7 @@ The repository includes a dedicated Node.js smoke testing script that validates 
 # Execute against live staging deployments
 node scripts/staging_smoke_tests.js \
   --frontend=https://virtual-classroom-staging.vercel.app \
-  --backend=https://virtual-classroom-staging.onrender.com
+  --backend=https://virtual-classroom-backend-staging.onrender.com
 ```
 
 ### 2.2 Dry-Run Verification (Pre-Flight)
@@ -71,14 +77,14 @@ curl -i https://<your-render-app>.onrender.com/actuator/health
 ```bash
 curl -i https://<your-render-app>.onrender.com/actuator/health/readiness
 ```
-- **Verify:** Returns HTTP 200 OK, confirming the application successfully established a pooler connection to Supabase via `vc_app_user`.
+- **Verify:** Returns HTTP 200 OK, confirming the application successfully established a pooler connection to Supabase staging (`zrbpjcfssbtxxgrjtsca`) via `vc_app_user.zrbpjcfssbtxxgrjtsca`.
 
 #### Step 3: Error Masking Check
 ```bash
 curl -i https://<your-render-app>.onrender.com/api/v1/nonexistent-endpoint
 ```
 - **Verify:** Returns standard structured JSON error (`GlobalExceptionHandler`).
-- **Verify:** No Java stack traces, database schema names, or internal class paths are exposed.
+- **Verify:** No Java stack traces, database schema names, or internal class paths are exposed (`include-message: never`).
 
 ---
 
@@ -105,7 +111,7 @@ curl -i https://<your-render-app>.onrender.com/api/v1/nonexistent-endpoint
 #### Test Case A: Initial Administrator Login
 1. Log in with the bootstrapped staging admin credentials:
    - Email: `staging-admin@virtualclassroom.internal` (or configured `STAGING_ADMIN_EMAIL`)
-   - Password: `STAGING_ADMIN_INITIAL_PASSWORD`
+   - Password: `STAGING_ADMIN_PASSWORD`
 2. **Verify:** Backend returns HTTP 200 with JWT access token and user profile containing role `ADMIN`.
 3. **Verify:** Admin Dashboard renders user management and course management panels.
 
@@ -127,7 +133,7 @@ curl -i https://<your-render-app>.onrender.com/api/v1/nonexistent-endpoint
 
 #### Test Case A: Direct Public Access Rejection
 1. Attempt to construct a direct Supabase Storage public URL:
-   `https://tzbjmxtmysvzxdmspiui.supabase.co/storage/v1/object/public/classroom-materials/sample.pdf`
+   `https://zrbpjcfssbtxxgrjtsca.supabase.co/storage/v1/object/public/academic-assets/sample.pdf`
 2. **Verify:** Returns HTTP 400/404 or `{"statusCode":"404","error":"Bucket not found"}` confirming the bucket is strictly private (`public = false`).
 
 #### Test Case B: Backend-Authorized Signed URL Flow
@@ -143,7 +149,7 @@ curl -i https://<your-render-app>.onrender.com/api/v1/nonexistent-endpoint
 
 ### 3.5 Database RLS & Runtime User Integrity
 
-1. Connect to Supabase SQL editor using administrative credentials.
+1. Connect to Supabase staging SQL editor (`zrbpjcfssbtxxgrjtsca`) using administrative credentials.
 2. Verify runtime session limits and role properties:
    ```sql
    SELECT rolname, rolcanlogin, rolconnlimit, rolbypassrls
